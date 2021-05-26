@@ -71,7 +71,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
             var step2 = new Slice1D();
             step2.offset = count * 2;
             step2.lengthIndex = 1;
-
+            
             var (px, py) = dataset.GetValues(step1);
             for (var i = 0; i < dataset.lengths[step1.lengthIndex]; ++i)
             {
@@ -83,7 +83,8 @@ namespace UnityEngine.InputSystem.DmytroRnD
                 new NativeArray<TypeConversionEnumToFloat.Operation>(new TypeConversionEnumToFloat.Operation[0],
                     Allocator.Temp);
             var vec2mag =
-                new NativeArray<TypeConversionVector2ToMagnitude.Operation>(new[]
+                new NativeArray<TypeConversionVector2ToMagnitude.Operation>(
+                    new TypeConversionVector2ToMagnitude.Operation[]
                     {
                         new TypeConversionVector2ToMagnitude.Operation
                         {
@@ -97,7 +98,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
                     new TypeConversionVector3ToMagnitude.Operation[0],
                     Allocator.Temp);
             var floatOps =
-                new NativeArray<ProcessorSingleComponent.Operation>(new[]
+                new NativeArray<ProcessorSingleComponent.Operation>(new ProcessorSingleComponent.Operation[]
                     {
                         new ProcessorSingleComponent.Operation
                         {
@@ -125,6 +126,14 @@ namespace UnityEngine.InputSystem.DmytroRnD
             //Debug.Log($"{sum}");
 
             outputvar = sum;
+
+            dataset.lengths.Dispose();
+            dataset.timestamps.Dispose();
+            dataset.values.Dispose();
+            enum2int.Dispose();
+            vec2mag.Dispose();
+            vec3mag.Dispose();
+            floatOps.Dispose();
 
             Profiler.EndSample();
 

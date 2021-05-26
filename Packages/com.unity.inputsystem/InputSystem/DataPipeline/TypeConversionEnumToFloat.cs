@@ -8,7 +8,7 @@ namespace UnityEngine.InputSystem.DataPipeline
     // Converts single integer enum component to single float component.
     // N->N conversion.
     [BurstCompile]
-    internal struct TypeConversionEnumToFloat : IJob 
+    internal struct TypeConversionEnumToFloat : IJob
     {
         public struct Operation
         {
