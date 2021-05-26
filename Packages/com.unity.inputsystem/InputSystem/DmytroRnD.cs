@@ -80,12 +80,12 @@ namespace UnityEngine.InputSystem.DmytroRnD
             }
 
             var enum2int =
-                new NativeArray<EnumToFloatTypeConversion.Operation>(new EnumToFloatTypeConversion.Operation[0],
+                new NativeArray<TypeConversionEnumToFloat.Operation>(new TypeConversionEnumToFloat.Operation[0],
                     Allocator.Temp);
             var vec2mag =
-                new NativeArray<Vector2ToMagnitudeTypeConversion.Operation>(new[]
+                new NativeArray<TypeConversionVector2ToMagnitude.Operation>(new[]
                     {
-                        new Vector2ToMagnitudeTypeConversion.Operation
+                        new TypeConversionVector2ToMagnitude.Operation
                         {
                             src = step1,
                             dst = step2
@@ -93,13 +93,13 @@ namespace UnityEngine.InputSystem.DmytroRnD
                     },
                     Allocator.Temp);
             var vec3mag =
-                new NativeArray<Vector3ToMagnitudeTypeConversion.Operation>(
-                    new Vector3ToMagnitudeTypeConversion.Operation[0],
+                new NativeArray<TypeConversionVector3ToMagnitude.Operation>(
+                    new TypeConversionVector3ToMagnitude.Operation[0],
                     Allocator.Temp);
             var floatOps =
-                new NativeArray<SingleComponentProcessor.Operation>(new[]
+                new NativeArray<ProcessorSingleComponent.Operation>(new[]
                     {
-                        new SingleComponentProcessor.Operation
+                        new ProcessorSingleComponent.Operation
                         {
                             slice = step2,
                             minRange = 0.0f,

@@ -8,7 +8,7 @@ namespace UnityEngine.InputSystem.DataPipeline
     // Converts single integer enum component to single float component.
     // N->N conversion.
     [BurstCompile]
-    internal struct EnumToFloatTypeConversion : IJob 
+    internal struct TypeConversionEnumToFloat : IJob 
     {
         public struct Operation
         {
@@ -19,9 +19,9 @@ namespace UnityEngine.InputSystem.DataPipeline
         public readonly NativeArray<Operation> operations;
         public InputDataset dataset;
         
-        private static readonly ProfilerMarker s_OperationMarker = new ProfilerMarker("EnumToFloatTypeConversion");
+        private static readonly ProfilerMarker s_OperationMarker = new ProfilerMarker("EnumToFloat");
         
-        public EnumToFloatTypeConversion(NativeArray<Operation> setOperations, InputDataset setDataset)
+        public TypeConversionEnumToFloat(NativeArray<Operation> setOperations, InputDataset setDataset)
         {
             operations = setOperations;
             dataset = setDataset;

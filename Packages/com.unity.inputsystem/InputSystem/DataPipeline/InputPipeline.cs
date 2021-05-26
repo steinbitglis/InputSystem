@@ -13,36 +13,36 @@ namespace UnityEngine.InputSystem.DataPipeline
     {
         public InputDataset dataset;
 
-        public EnumToFloatTypeConversion enumToFloatTypeConversion;
-        public Vector2ToMagnitudeTypeConversion vector2ToMagnitudeTypeConversion;
-        public Vector3ToMagnitudeTypeConversion vector3ToMagnitudeTypeConversion;
-        public SingleComponentProcessor singleComponentProcessor;
+        public TypeConversionEnumToFloat typeConversionEnumToFloat;
+        public TypeConversionVector2ToMagnitude typeConversionVector2ToMagnitude;
+        public TypeConversionVector3ToMagnitude typeConversionVector3ToMagnitude;
+        public ProcessorSingleComponent processorSingleComponent;
 
         private static readonly ProfilerMarker s_PipelineMarker = new ProfilerMarker("InputPipeline");
 
         public InputPipeline(
-            NativeArray<EnumToFloatTypeConversion.Operation> enumToFloatTypeConversionOperations,
-            NativeArray<Vector2ToMagnitudeTypeConversion.Operation> vector2ToMagnitudeTypeConversionOperations,
-            NativeArray<Vector3ToMagnitudeTypeConversion.Operation> vector3ToMagnitudeTypeConversionOperations,
-            NativeArray<SingleComponentProcessor.Operation> singleComponentProcessorOperations,
+            NativeArray<TypeConversionEnumToFloat.Operation> enumToFloatTypeConversionOperations,
+            NativeArray<TypeConversionVector2ToMagnitude.Operation> vector2ToMagnitudeTypeConversionOperations,
+            NativeArray<TypeConversionVector3ToMagnitude.Operation> vector3ToMagnitudeTypeConversionOperations,
+            NativeArray<ProcessorSingleComponent.Operation> singleComponentProcessorOperations,
             InputDataset setDataset
         )
         {
             dataset = setDataset;
-            enumToFloatTypeConversion = new EnumToFloatTypeConversion(enumToFloatTypeConversionOperations, dataset);
-            vector2ToMagnitudeTypeConversion =
-                new Vector2ToMagnitudeTypeConversion(vector2ToMagnitudeTypeConversionOperations, dataset);
-            vector3ToMagnitudeTypeConversion =
-                new Vector3ToMagnitudeTypeConversion(vector3ToMagnitudeTypeConversionOperations, dataset);
-            singleComponentProcessor = new SingleComponentProcessor(singleComponentProcessorOperations, dataset);
+            typeConversionEnumToFloat = new TypeConversionEnumToFloat(enumToFloatTypeConversionOperations, dataset);
+            typeConversionVector2ToMagnitude =
+                new TypeConversionVector2ToMagnitude(vector2ToMagnitudeTypeConversionOperations, dataset);
+            typeConversionVector3ToMagnitude =
+                new TypeConversionVector3ToMagnitude(vector3ToMagnitudeTypeConversionOperations, dataset);
+            processorSingleComponent = new ProcessorSingleComponent(singleComponentProcessorOperations, dataset);
         }
 
         public void Execute()
         {
-            enumToFloatTypeConversion.Execute();
-            vector2ToMagnitudeTypeConversion.Execute();
-            vector3ToMagnitudeTypeConversion.Execute();
-            singleComponentProcessor.Execute();
+            typeConversionEnumToFloat.Execute();
+            typeConversionVector2ToMagnitude.Execute();
+            typeConversionVector3ToMagnitude.Execute();
+            processorSingleComponent.Execute();
         }
 
         [BurstDiscard]
