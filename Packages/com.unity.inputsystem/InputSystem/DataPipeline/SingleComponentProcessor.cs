@@ -2,6 +2,7 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
+using Unity.Profiling;
 
 namespace UnityEngine.InputSystem.DataPipeline
 {
@@ -38,38 +39,50 @@ namespace UnityEngine.InputSystem.DataPipeline
         public readonly NativeArray<Operation> operations;
         public InputDataset dataset;
 
+        private static readonly ProfilerMarker s_OperationMarker =
+            new ProfilerMarker("SingleComponentProcessor");
+
+        public SingleComponentProcessor(NativeArray<Operation> setOperations, InputDataset setDataset)
+        {
+            operations = setOperations;
+            dataset = setDataset;
+        }
+
         public void Execute()
         {
             foreach (var op in operations)
             {
-                var length = dataset.lengths[op.slice.lengthIndex];
-                var v = dataset.GetValues(op.slice);
-
-                for (var i = 0; i < length; ++i)
+                using (s_OperationMarker.Auto())
                 {
-                    var v0 = v[i];
+                    var length = dataset.lengths[op.slice.lengthIndex];
+                    var v = dataset.GetValues(op.slice);
 
-                    // branchless conditional abs
-                    var v1 = Mathf.LerpUnclamped(v0, (v0 < 0.0f ? -v0 : v0), op.processAsAbs);
+                    for (var i = 0; i < length; ++i)
+                    {
+                        var v0 = v[i];
 
-                    // branchless conditional clamp|compare
-                    var clamped = Mathf.Clamp(v1, op.minRange, op.maxRange);
-                    var banded = (v1 <= op.maxRange)
-                        ? (v1 >= op.minRange ? op.compareResultIfInRange : op.compareResultIfOutOfRange)
-                        : op.compareResultIfOutOfRange;
-                    var v2 = Mathf.LerpUnclamped(clamped, banded, op.compare);
+                        // branchless conditional abs
+                        var v1 = Mathf.LerpUnclamped(v0, (v0 < 0.0f ? -v0 : v0), op.processAsAbs);
 
-                    // branchless conditional normalize
-                    var normalized = (v2 - op.minRange) / (op.maxRange - op.minRange);
-                    var v3 = Mathf.LerpUnclamped(v2, normalized, op.normalize);
+                        // branchless conditional clamp|compare
+                        var clamped = Mathf.Clamp(v1, op.minRange, op.maxRange);
+                        var banded = (v1 <= op.maxRange)
+                            ? (v1 >= op.minRange ? op.compareResultIfInRange : op.compareResultIfOutOfRange)
+                            : op.compareResultIfOutOfRange;
+                        var v2 = Mathf.LerpUnclamped(clamped, banded, op.compare);
 
-                    // branchless conditional sign restore
-                    var v4 = Mathf.LerpUnclamped(v3, (v0 < 0.0f ? -v3 : v3), op.processAsAbs);
+                        // branchless conditional normalize
+                        var normalized = (v2 - op.minRange) / (op.maxRange - op.minRange);
+                        var v3 = Mathf.LerpUnclamped(v2, normalized, op.normalize);
 
-                    // FMA
-                    var v5 = v4 * op.scale + op.offset;
+                        // branchless conditional sign restore
+                        var v4 = Mathf.LerpUnclamped(v3, (v0 < 0.0f ? -v3 : v3), op.processAsAbs);
 
-                    v[i] = v5;
+                        // FMA
+                        var v5 = v4 * op.scale + op.offset;
+
+                        v[i] = v5;
+                    }
                 }
             }
         }

@@ -1,12 +1,15 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
-using UnityEditorInternal;
+//using UnityEditorInternal;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.Profiling;
 using UnityEngineInternal.Input;
+using UnityEngine.InputSystem.DataPipeline;
 
 namespace UnityEngine.InputSystem.DmytroRnD
 {
@@ -28,7 +31,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
         internal static void NativeClear()
         {
             return;
-            
+
             for (var i = 0; i < Devices.Length; ++i)
                 Devices[i].Clear();
             Devices = new NativeDeviceState[0];
@@ -44,10 +47,89 @@ namespace UnityEngine.InputSystem.DmytroRnD
         {
         }
 
+        public static float outputvar;
+
+
         internal static unsafe void NativeUpdate(NativeInputUpdateType updateType, NativeInputEventBuffer* buffer)
         {
-            return;
+            Profiler.BeginSample("Core.NativeUpdate");
+
+            var dataset = new InputDataset();
+
+            const int count = 10000;
+
+            dataset.lengths = new NativeArray<int>(2, Allocator.Temp);
+            dataset.timestamps = new NativeArray<ulong>(count * 3, Allocator.Temp);
+            dataset.values = new NativeArray<float>(count * 3, Allocator.Temp);
+
+            var step1 = new Slice2D();
+            step1.offset[0] = count * 0;
+            step1.offset[1] = count * 1;
+            step1.lengthIndex = 0;
+            dataset.lengths[0] = count;
             
+            var step2 = new Slice1D();
+            step2.offset = count * 2;
+            step2.lengthIndex = 1;
+
+            var (px, py) = dataset.GetValues(step1);
+            for (var i = 0; i < dataset.lengths[step1.lengthIndex]; ++i)
+            {
+                px[i] = Random.Range(-5.0f, 5.0f);
+                py[i] = Random.Range(-5.0f, 5.0f);
+            }
+
+            var enum2int =
+                new NativeArray<EnumToFloatTypeConversion.Operation>(new EnumToFloatTypeConversion.Operation[0],
+                    Allocator.Temp);
+            var vec2mag =
+                new NativeArray<Vector2ToMagnitudeTypeConversion.Operation>(new[]
+                    {
+                        new Vector2ToMagnitudeTypeConversion.Operation
+                        {
+                            src = step1,
+                            dst = step2
+                        }
+                    },
+                    Allocator.Temp);
+            var vec3mag =
+                new NativeArray<Vector3ToMagnitudeTypeConversion.Operation>(
+                    new Vector3ToMagnitudeTypeConversion.Operation[0],
+                    Allocator.Temp);
+            var floatOps =
+                new NativeArray<SingleComponentProcessor.Operation>(new[]
+                    {
+                        new SingleComponentProcessor.Operation
+                        {
+                            slice = step2,
+                            minRange = 0.0f,
+                            maxRange = 7.0f,
+                            compare = 0.0f,
+                            normalize = 1.0f,
+                            scale = 1.0f,
+                            offset = 0.0f
+                        }
+                    },
+                    Allocator.Temp);
+
+            var pipeline = new InputPipeline(enum2int, vec2mag, vec3mag, floatOps, dataset);
+
+            pipeline.Run(null, null);
+
+            var pz = dataset.GetValues(step2);
+            var sum = 0.0f;
+            for (var i = 0; i < dataset.lengths[step2.lengthIndex]; ++i)
+            {
+                sum += pz[i];
+            }
+            //Debug.Log($"{sum}");
+
+            outputvar = sum;
+
+            Profiler.EndSample();
+
+            return;
+
             Profiler.BeginSample("Core.NativeUpdate");
 
             // it could be a case, that we get a callback before anything is set at all
