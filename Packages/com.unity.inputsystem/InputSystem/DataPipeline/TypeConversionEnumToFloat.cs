@@ -6,14 +6,18 @@ using Unity.Profiling;
 namespace UnityEngine.InputSystem.DataPipeline
 {
     // Converts single integer enum component to single float component.
+    // Applies bit mask first, then looks into enum LUT with offset.
     // N->N conversion.
     [BurstCompile]
     internal struct TypeConversionEnumToFloat : IJob
     {
         public struct Operation
         {
-            public Slice1D src;
+            public SliceEnum src;
             public Slice1D dst;
+
+            public int mask;
+            public int offsetInLUT;
         }
 
         public readonly NativeArray<Operation> operations;
@@ -29,7 +33,19 @@ namespace UnityEngine.InputSystem.DataPipeline
 
         public void Execute()
         {
-            // TODO
+            foreach (var op in operations)
+            {
+                using (s_OperationMarker.Auto())
+                {
+                    var length = dataset.SetLengthAsNToNMapping(op.src, op.dst);
+                    var src = dataset.GetValues(op.src);
+                    var dst = dataset.GetValues(op.dst);
+
+                    // No SIMD here yet :(
+                    for (var i = 0; i < length; ++i)
+                        dst[i] = dataset.enumLUT[(src[i] & op.mask) + op.offsetInLUT];
+                }
+            }
         }
     }
 }

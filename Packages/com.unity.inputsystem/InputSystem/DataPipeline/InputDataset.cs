@@ -31,12 +31,23 @@ namespace UnityEngine.InputSystem.DataPipeline
         
         public int lengthIndexProperty => lengthIndex;
     }
+    
+    public struct SliceEnum : ISlice
+    {
+        public int offset;
+        public int lengthIndex;
+
+        public int lengthIndexProperty => lengthIndex;
+    }
 
     public struct InputDataset
     {
         public NativeArray<ulong> timestamps;
         public NativeArray<float> values;
         public NativeArray<int> lengths;
+
+        public NativeArray<int> enumValues;
+        public NativeArray<float> enumLUT;
 
         // TODO values before current ones?
         // TODO many-dimensions values?
@@ -52,6 +63,12 @@ namespace UnityEngine.InputSystem.DataPipeline
         public NativeSlice<float> GetValues(Slice1D slice)
         {
             return new NativeSlice<float>(values, slice.offset, lengths[slice.lengthIndex]);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public NativeSlice<int> GetValues(SliceEnum slice)
+        {
+            return new NativeSlice<int>(enumValues, slice.offset, lengths[slice.lengthIndex]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

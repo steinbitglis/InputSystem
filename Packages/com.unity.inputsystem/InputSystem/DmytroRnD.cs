@@ -58,9 +58,11 @@ namespace UnityEngine.InputSystem.DmytroRnD
 
             const int count = 10000;
 
-            dataset.lengths = new NativeArray<int>(2, Allocator.Temp);
-            dataset.timestamps = new NativeArray<ulong>(count * 3, Allocator.Temp);
-            dataset.values = new NativeArray<float>(count * 3, Allocator.Temp);
+            dataset.lengths = new NativeArray<int>(2, Allocator.Persistent);
+            dataset.timestamps = new NativeArray<ulong>(count * 3, Allocator.Persistent);
+            dataset.values = new NativeArray<float>(count * 3, Allocator.Persistent);
+            dataset.enumLUT = new NativeArray<float>(1, Allocator.Persistent);
+            dataset.enumValues = new NativeArray<int>(1, Allocator.Persistent);
 
             var step1 = new Slice2D();
             step1.offset[0] = count * 0;
@@ -80,8 +82,11 @@ namespace UnityEngine.InputSystem.DmytroRnD
             }
 
             var enum2int =
-                new NativeArray<TypeConversionEnumToFloat.Operation>(new TypeConversionEnumToFloat.Operation[0],
-                    Allocator.Temp);
+                new NativeArray<TypeConversionEnumToFloat.Operation>(new TypeConversionEnumToFloat.Operation[]
+                    {
+                        
+                    },
+                    Allocator.Persistent);
             var vec2mag =
                 new NativeArray<TypeConversionVector2ToMagnitude.Operation>(
                     new TypeConversionVector2ToMagnitude.Operation[]
@@ -92,11 +97,14 @@ namespace UnityEngine.InputSystem.DmytroRnD
                             dst = step2
                         }
                     },
-                    Allocator.Temp);
+                    Allocator.Persistent);
             var vec3mag =
                 new NativeArray<TypeConversionVector3ToMagnitude.Operation>(
-                    new TypeConversionVector3ToMagnitude.Operation[0],
-                    Allocator.Temp);
+                    new TypeConversionVector3ToMagnitude.Operation[]
+                    {
+                        
+                    },
+                    Allocator.Persistent);
             var floatOps =
                 new NativeArray<ProcessorSingleComponent.Operation>(new ProcessorSingleComponent.Operation[]
                     {
@@ -111,7 +119,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
                             offset = 0.0f
                         }
                     },
-                    Allocator.Temp);
+                    Allocator.Persistent);
 
             var pipeline = new InputPipeline(enum2int, vec2mag, vec3mag, floatOps, dataset);
 
@@ -130,6 +138,8 @@ namespace UnityEngine.InputSystem.DmytroRnD
             dataset.lengths.Dispose();
             dataset.timestamps.Dispose();
             dataset.values.Dispose();
+            dataset.enumLUT.Dispose();
+            dataset.enumValues.Dispose();
             enum2int.Dispose();
             vec2mag.Dispose();
             vec3mag.Dispose();
