@@ -22,9 +22,9 @@ namespace UnityEngine.InputSystem.DataPipeline
 
         public readonly NativeArray<Operation> operations;
         public InputDataset dataset;
-        
+
         private static readonly ProfilerMarker s_OperationMarker = new ProfilerMarker("EnumToFloat");
-        
+
         public TypeConversionEnumToFloat(NativeArray<Operation> setOperations, InputDataset setDataset)
         {
             operations = setOperations;
@@ -41,7 +41,7 @@ namespace UnityEngine.InputSystem.DataPipeline
                     var src = dataset.GetValues(op.src);
                     var dst = dataset.GetValues(op.dst);
 
-                    // No SIMD here yet :(
+                    // TODO No SIMD here yet :( do we need AVX-512?
                     for (var i = 0; i < length; ++i)
                         dst[i] = dataset.enumLUT[(src[i] & op.mask) + op.offsetInLUT];
                 }

@@ -9,7 +9,7 @@ namespace UnityEngine.InputSystem.DataPipeline
     // Processes single component value
     // N->N conversion.
     [BurstCompile]
-    internal struct ProcessorSingleComponent : IJob
+    internal struct Processor1D : IJob
     {
         public struct Operation
         {
@@ -40,9 +40,9 @@ namespace UnityEngine.InputSystem.DataPipeline
         public InputDataset dataset;
 
         private static readonly ProfilerMarker s_OperationMarker =
-            new ProfilerMarker("SingleComponent");
+            new ProfilerMarker("Processor1D");
 
-        public ProcessorSingleComponent(NativeArray<Operation> setOperations, InputDataset setDataset)
+        public Processor1D(NativeArray<Operation> setOperations, InputDataset setDataset)
         {
             operations = setOperations;
             dataset = setDataset;

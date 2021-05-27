@@ -106,9 +106,9 @@ namespace UnityEngine.InputSystem.DmytroRnD
                     },
                     Allocator.Persistent);
             var floatOps =
-                new NativeArray<ProcessorSingleComponent.Operation>(new ProcessorSingleComponent.Operation[]
+                new NativeArray<Processor1D.Operation>(new Processor1D.Operation[]
                     {
-                        new ProcessorSingleComponent.Operation
+                        new Processor1D.Operation
                         {
                             slice = step2,
                             minRange = 0.0f,
@@ -120,8 +120,18 @@ namespace UnityEngine.InputSystem.DmytroRnD
                         }
                     },
                     Allocator.Persistent);
+            var vec2Ops =
+                new NativeArray<Processor2D.Operation>(new Processor2D.Operation[]
+                    {
+                    },
+                    Allocator.Persistent);
+            var accOps =
+                new NativeArray<Accumulate1D.Operation>(new Accumulate1D.Operation[]
+                    {
+                    },
+                    Allocator.Persistent);
 
-            var pipeline = new InputPipeline(enum2int, vec2mag, vec3mag, floatOps, dataset);
+            var pipeline = new InputPipeline(enum2int, vec2mag, vec3mag, floatOps, vec2Ops, accOps, dataset);
 
             pipeline.Run(null, null);
 
@@ -144,6 +154,8 @@ namespace UnityEngine.InputSystem.DmytroRnD
             vec2mag.Dispose();
             vec3mag.Dispose();
             floatOps.Dispose();
+            vec2Ops.Dispose();
+            accOps.Dispose();
 
             Profiler.EndSample();
 
