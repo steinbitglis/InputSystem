@@ -52,71 +52,95 @@ namespace UnityEngine.InputSystem.DmytroRnD
 
         internal static unsafe void NativeUpdate(NativeInputUpdateType updateType, NativeInputEventBuffer* buffer)
         {
+            //2return;
+            
             Profiler.BeginSample("Core.NativeUpdate");
 
             var dataset = new InputDataset();
 
-            const int count = 10000;
+            const int count = 2000;
 
-            dataset.lengths = new NativeArray<int>(2, Allocator.Persistent);
-            dataset.timestamps = new NativeArray<ulong>(count * 3, Allocator.Persistent);
-            dataset.values = new NativeArray<float>(count * 3, Allocator.Persistent);
-            dataset.enumLUT = new NativeArray<float>(1, Allocator.Persistent);
-            dataset.enumValues = new NativeArray<int>(1, Allocator.Persistent);
+            dataset.lengths = new NativeArray<int>(3, Allocator.Persistent);
+            dataset.timestamps = new NativeArray<ulong>(count * 4, Allocator.Persistent);
+            dataset.values = new NativeArray<float>(count * 4, Allocator.Persistent);
+            dataset.enumLUT = new NativeArray<float>(0, Allocator.Persistent);
+            dataset.enumValues = new NativeArray<int>(0, Allocator.Persistent);
 
-            var step1 = new Slice2D();
-            step1.offset[0] = count * 0;
-            step1.offset[1] = count * 1;
-            step1.lengthIndex = 0;
-            dataset.lengths[0] = count;
-            
-            var step2 = new Slice1D();
-            step2.offset = count * 2;
-            step2.lengthIndex = 1;
-            
-            var (px, py) = dataset.GetValues(step1);
-            for (var i = 0; i < dataset.lengths[step1.lengthIndex]; ++i)
+            var slice1 = new Slice1D();
+            slice1.offset = count * 0;
+            slice1.timestampsOffset = count * 0;
+            slice1.lengthIndex = 0;
+            dataset.lengths[slice1.lengthIndex] = count;
+
+            var slice2 = new Slice1D();
+            slice2.offset = count * 1;
+            slice2.timestampsOffset = count * 1;
+            slice2.lengthIndex = 1;
+            dataset.lengths[slice2.lengthIndex] = count;
+
+            var slice3 = new Slice1D();
+            slice3.offset = count * 2;
+            slice3.timestampsOffset = count * 2;
+            slice3.lengthIndex = 2;
+            dataset.lengths[slice3.lengthIndex] = count * 2;
+
+            var t1 = dataset.GetTimestamps(slice1);
+            var v1 = dataset.GetValues(slice1);
+            for (var i = 0; i < dataset.lengths[slice1.lengthIndex]; ++i)
             {
-                px[i] = Random.Range(-5.0f, 5.0f);
-                py[i] = Random.Range(-5.0f, 5.0f);
+                t1[i] = ((ulong)i + 1) * 2 + 0;
+                v1[i] = Random.Range(-3.0f, 3.0f);
+            }
+
+            var t2 = dataset.GetTimestamps(slice2);
+            var v2 = dataset.GetValues(slice2);
+            for (var i = 0; i < dataset.lengths[slice2.lengthIndex]; ++i)
+            {
+                t2[i] = ((ulong)i + 1) * 2 + 1;
+                v2[i] = Random.Range(-5.0f, 5.0f);
             }
 
             var enum2int =
                 new NativeArray<TypeConversionEnumToFloat.Operation>(new TypeConversionEnumToFloat.Operation[]
                     {
-                        
                     },
                     Allocator.Persistent);
             var vec2mag =
                 new NativeArray<TypeConversionVector2ToMagnitude.Operation>(
                     new TypeConversionVector2ToMagnitude.Operation[]
                     {
-                        new TypeConversionVector2ToMagnitude.Operation
-                        {
-                            src = step1,
-                            dst = step2
-                        }
                     },
                     Allocator.Persistent);
             var vec3mag =
                 new NativeArray<TypeConversionVector3ToMagnitude.Operation>(
                     new TypeConversionVector3ToMagnitude.Operation[]
                     {
-                        
                     },
                     Allocator.Persistent);
             var floatOps =
                 new NativeArray<Processor1D.Operation>(new Processor1D.Operation[]
                     {
-                        new Processor1D.Operation
+                        new Processor1D.Operation()
                         {
-                            slice = step2,
-                            minRange = 0.0f,
-                            maxRange = 7.0f,
+                            slice = slice1,
+                            minRange = 0.2f, // [0.0-0.2f) deadzone
+                            maxRange = 3.0f,
                             compare = 0.0f,
                             normalize = 1.0f,
-                            scale = 1.0f,
-                            offset = 0.0f
+                            scale = 0.7f,
+                            offset = 0.0f,
+                            processAsAbs = 1.0f
+                        },
+                        new Processor1D.Operation()
+                        {
+                            slice = slice2,
+                            minRange = -5.0f,
+                            maxRange = 5.0f,
+                            compare = 0.0f,
+                            normalize = 1.0f,
+                            scale = 1.2f,
+                            offset = 0.0f,
+                            processAsAbs = 0.0f
                         }
                     },
                     Allocator.Persistent);
@@ -128,18 +152,37 @@ namespace UnityEngine.InputSystem.DmytroRnD
             var accOps =
                 new NativeArray<Accumulate1D.Operation>(new Accumulate1D.Operation[]
                     {
+                        new Accumulate1D.Operation()
+                        {
+                            slice = slice1
+                        }
+                    },
+                    Allocator.Persistent);
+            var mrg1d1dOps =
+                new NativeArray<MergerLatest1D1D.Operation>(new MergerLatest1D1D.Operation[]
+                    {
+                        new MergerLatest1D1D.Operation()
+                        {
+                            src1 = slice1,
+                            src2 = slice2,
+                            dst = slice3
+                        }
                     },
                     Allocator.Persistent);
 
-            var pipeline = new InputPipeline(enum2int, vec2mag, vec3mag, floatOps, vec2Ops, accOps, dataset);
+            var pipeline =
+                new InputPipeline(enum2int, vec2mag, vec3mag, floatOps, vec2Ops, accOps, mrg1d1dOps, dataset);
 
             pipeline.Run(null, null);
 
-            var pz = dataset.GetValues(step2);
+            var t3 = dataset.GetTimestamps(slice3);
+            var v3 = dataset.GetValues(slice3);
+
             var sum = 0.0f;
-            for (var i = 0; i < dataset.lengths[step2.lengthIndex]; ++i)
+            for (var i = 0; i < dataset.lengths[slice3.lengthIndex]; ++i)
             {
-                sum += pz[i];
+                //Debug.Log($"{i} {t3[i]} {v3[i]}");
+                sum += v3[i] + (float)t3[i]; // avoiding stripping
             }
             //Debug.Log($"{sum}");
 
@@ -156,6 +199,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
             floatOps.Dispose();
             vec2Ops.Dispose();
             accOps.Dispose();
+            mrg1d1dOps.Dispose();
 
             Profiler.EndSample();
 

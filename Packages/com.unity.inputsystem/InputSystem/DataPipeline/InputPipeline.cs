@@ -22,6 +22,8 @@ namespace UnityEngine.InputSystem.DataPipeline
         
         public Accumulate1D accumulate1D;
 
+        public MergerLatest1D1D mergerLatest1D1D;
+
         private static readonly ProfilerMarker s_PipelineMarker = new ProfilerMarker("InputPipeline");
 
         public InputPipeline(
@@ -31,18 +33,24 @@ namespace UnityEngine.InputSystem.DataPipeline
             NativeArray<Processor1D.Operation> processor1DOperations,
             NativeArray<Processor2D.Operation> processor2DOperations,
             NativeArray<Accumulate1D.Operation> accumulate1DOperations,
+            NativeArray<MergerLatest1D1D.Operation> mergerLatest1D1DOperations,
             InputDataset setDataset
         )
         {
             dataset = setDataset;
+            
             typeConversionEnumToFloat = new TypeConversionEnumToFloat(typeConversionEnumToFloatOperations, dataset);
             typeConversionVector2ToMagnitude =
                 new TypeConversionVector2ToMagnitude(typeConversionVector2ToMagnitudeOperations, dataset);
             typeConversionVector3ToMagnitude =
                 new TypeConversionVector3ToMagnitude(typeConversionVector3ToMagnitudeOperations, dataset);
+            
             processor1D = new Processor1D(processor1DOperations, dataset);
             processor2D = new Processor2D(processor2DOperations, dataset);
+            
             accumulate1D = new Accumulate1D(accumulate1DOperations, dataset);
+
+            mergerLatest1D1D = new MergerLatest1D1D(mergerLatest1D1DOperations, dataset);
         }
 
         public void Execute()
@@ -53,6 +61,7 @@ namespace UnityEngine.InputSystem.DataPipeline
             processor1D.Execute();
             processor2D.Execute();
             accumulate1D.Execute();
+            mergerLatest1D1D.Execute();
         }
 
         [BurstDiscard]

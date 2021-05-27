@@ -6,38 +6,48 @@ namespace UnityEngine.InputSystem.DataPipeline
     public interface ISlice
     {
         public int lengthIndexProperty { get; }
+        
+        public int timestampsOffsetProperty { get; }
     }
     
     public struct Slice1D : ISlice
     {
         public int offset;
+        public int timestampsOffset;
         public int lengthIndex;
 
         public int lengthIndexProperty => lengthIndex;
+        public int timestampsOffsetProperty => timestampsOffset;
     }
 
     public unsafe struct Slice2D : ISlice
     {
         public fixed int offset[2];
+        public int timestampsOffset;
         public int lengthIndex;
 
         public int lengthIndexProperty => lengthIndex;
+        public int timestampsOffsetProperty => timestampsOffset;
     }
 
     public unsafe struct Slice3D : ISlice
     {
         public fixed int offset[3];
+        public int timestampsOffset;
         public int lengthIndex;
         
         public int lengthIndexProperty => lengthIndex;
+        public int timestampsOffsetProperty => timestampsOffset;
     }
     
     public struct SliceEnum : ISlice
     {
         public int offset;
+        public int timestampsOffset;
         public int lengthIndex;
 
         public int lengthIndexProperty => lengthIndex;
+        public int timestampsOffsetProperty => timestampsOffset;
     }
 
     public struct InputDataset
@@ -57,6 +67,12 @@ namespace UnityEngine.InputSystem.DataPipeline
             var length = lengths[src.lengthIndexProperty];
             lengths[dst.lengthIndexProperty] = length;
             return length;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public NativeSlice<ulong> GetTimestamps<T>(T slice) where T : ISlice
+        {
+            return new NativeSlice<ulong>(timestamps, slice.timestampsOffsetProperty, lengths[slice.lengthIndexProperty]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
