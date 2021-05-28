@@ -1,8 +1,21 @@
 ﻿using System.Runtime.CompilerServices;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace UnityEngine.InputSystem.DataPipeline
 {
+    /*
+    public struct RuntimeLength
+    {
+        public unsafe int* length;
+
+        public unsafe int Get()
+        {
+            return *length;
+        }
+    }
+    
+    
     public interface ISlice
     {
         public int lengthIndexProperty { get; }
@@ -68,6 +81,15 @@ namespace UnityEngine.InputSystem.DataPipeline
             lengths[dst.lengthIndexProperty] = length;
             return length;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe RuntimeLength GetLengthWIP(int index)
+        {
+            return new RuntimeLength
+            {
+                length = (int*)NativeArrayUnsafeUtility.GetUnsafePtr(lengths) + index
+            };
+        }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public NativeSlice<ulong> GetTimestamps<T>(T slice) where T : ISlice
@@ -102,4 +124,5 @@ namespace UnityEngine.InputSystem.DataPipeline
                 new NativeSlice<float>(values, slice.offset[2], lengths[slice.lengthIndex]));
         }
     };
+    */
 }

@@ -1,7 +1,7 @@
 ﻿namespace UnityEngine.InputSystem.DataPipeline
 {
-    public interface IUserPipelineStep
-    {
-        public void Execute(InputDataset dataset);
-    }
+    // public interface IUserPipelineStep
+    // {
+    //     public void Execute(InputDataset dataset);
+    // }
 }
