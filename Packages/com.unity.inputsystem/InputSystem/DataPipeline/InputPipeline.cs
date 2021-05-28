@@ -2,6 +2,7 @@
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Profiling;
+using UnityEngine.InputSystem.DataPipeline.Demux;
 using UnityEngine.InputSystem.DataPipeline.Merger;
 using UnityEngine.InputSystem.DataPipeline.Processor;
 using UnityEngine.InputSystem.DataPipeline.SlidingWindow;
@@ -13,6 +14,8 @@ namespace UnityEngine.InputSystem.DataPipeline
     [BurstCompile]
     internal struct InputPipeline : IJob
     {
+        public NativeArray<DynamicDemuxer> dynamicDemuxers;
+
         public NativeArray<EnumToFloat> enumsToFloats;
         public NativeArray<Vec2ToMagnitude> vec2sToMagnitudes;
 
@@ -22,6 +25,7 @@ namespace UnityEngine.InputSystem.DataPipeline
 
         public NativeArray<Latest1D> latest1Ds;
 
+        private static readonly ProfilerMarker s_MarkerDynamicDemuxer = new ProfilerMarker("DynamicDemuxer");
         private static readonly ProfilerMarker s_MarkerEnumToFloat = new ProfilerMarker("EnumToFloat");
         private static readonly ProfilerMarker s_MarkerVec2ToMagnitude = new ProfilerMarker("Vec2ToMagnitude");
         private static readonly ProfilerMarker s_MarkerProcessor1D = new ProfilerMarker("Processor1D");
@@ -30,6 +34,10 @@ namespace UnityEngine.InputSystem.DataPipeline
 
         public void Execute()
         {
+            foreach (var op in dynamicDemuxers)
+                using (s_MarkerDynamicDemuxer.Auto())
+                    op.Execute();
+            
             foreach (var op in enumsToFloats)
                 using (s_MarkerEnumToFloat.Auto())
                     op.Execute();
@@ -53,6 +61,8 @@ namespace UnityEngine.InputSystem.DataPipeline
 
         public void Dispose()
         {
+            dynamicDemuxers.Dispose();
+
             enumsToFloats.Dispose();
             vec2sToMagnitudes.Dispose();
 

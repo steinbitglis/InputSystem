@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -52,6 +53,19 @@ namespace UnityEngine.InputSystem.DmytroRnD
         }
 
         public static float outputvar;
+        
+        // allow padding in the end, so the size is != 30
+        [StructLayout(LayoutKind.Explicit, Size = 32)]
+        public struct NativeMouseStateTest
+        {
+            [FieldOffset(0)] public Vector2 Position;
+            [FieldOffset(8)] public Vector2 Delta;
+            [FieldOffset(16)] public Vector2 Scroll;
+            [FieldOffset(24)] public ushort Buttons;
+            [FieldOffset(26)] private ushort _displayIndex;
+            [FieldOffset(28)] public ushort ClickCount;
+            [FieldOffset(30)] private ushort _padding; // TODO
+        }
 
 
         internal static unsafe void NativeUpdate(NativeInputUpdateType updateType, NativeInputEventBuffer* buffer)
@@ -109,15 +123,62 @@ namespace UnityEngine.InputSystem.DmytroRnD
             // }
             */
 
+            
+            var mouseEvents = new NativeArray<NativeMouseStateTest>(1, Allocator.Persistent);
+            ((NativeMouseStateTest*)mouseEvents.GetUnsafePtr())[0].Position = new Vector2(3.5f, 2.0f);
+
+            var mouseEventPointers = (ulong**)UnsafeUtility.Malloc(8, 16, Allocator.Persistent);
+            mouseEventPointers[0] = (ulong*)mouseEvents.GetUnsafePtr();
+
+            var fields = (DataPipeline.Demux.DynamicDemuxer.Field*) UnsafeUtility.Malloc(
+                sizeof(DataPipeline.Demux.DynamicDemuxer.Field), 16, Allocator.Persistent);
+
+            fields[0].maskA = 0xffffffffu;
+            fields[0].shiftA = 0;
+            fields[0].maskB = 0;
+            fields[0].shiftB = 0;
+            fields[0].srcType = DataPipeline.Demux.DynamicDemuxer.SourceDataType.Float32;
+            fields[0].dstType = DataPipeline.Demux.DynamicDemuxer.DestinationDataType.Float32;
+            fields[0].srcUlongPairIndex = 0;
+            fields[0].dstIndex = 0;
+
+            var prevState = (ulong*) UnsafeUtility.Malloc(32, 16, Allocator.Persistent);
+            var changed = (ulong*) UnsafeUtility.Malloc(32, 16, Allocator.Persistent);
+
             var values = new NativeArray<float>(1000, Allocator.Persistent);
             var lengths = new NativeArray<int>(2, Allocator.Persistent);
+            
+            var dstFloatsData = (float**) UnsafeUtility.Malloc(8, 16, Allocator.Persistent);
+            var dstFloatsLengths = (int**) UnsafeUtility.Malloc(8, 16, Allocator.Persistent);
 
-            lengths[0] = 250;
-            lengths[1] = 250;
+            dstFloatsData[0] = (float*)values.GetUnsafePtr() + 0;
+            dstFloatsLengths[0] = (int*)lengths.GetUnsafePtr() + 0;
+
+            lengths[0] = 0;
+            //lengths[1] = 250;
 
             // TODO raw pointers needs patching mechanism so we won't allocate input pipeline every frame
             var pipeline = new InputPipeline
             {
+                dynamicDemuxers = new NativeArray<DataPipeline.Demux.DynamicDemuxer>(new DataPipeline.Demux.DynamicDemuxer[]
+                    {
+                        new DataPipeline.Demux.DynamicDemuxer
+                        {
+                            fields = fields,
+                            fieldCount = 1,
+                            srcStructs = mouseEventPointers,
+                            srcStructCount = 1,
+                            srcStructLength = 4,
+                            prevState = prevState,
+                            gotFirst = false,
+                            changed = changed,
+                            dstFloatData = dstFloatsData,
+                            dstFloatLengths = dstFloatsLengths,
+                            dstIntData = null,
+                            dstIntLengths = null
+                        }
+                    },
+                    Allocator.Persistent),
                 enumsToFloats = new NativeArray<EnumToFloat>(new EnumToFloat[]
                     {
                     },
@@ -128,36 +189,36 @@ namespace UnityEngine.InputSystem.DmytroRnD
                     Allocator.Persistent),
                 process1Ds = new NativeArray<Processor1D>(new Processor1D[]
                     {
-                        new Processor1D
-                        {
-                            src = (float*)values.Slice(0, 250).GetUnsafeReadOnlyPtr(),
-                            srcLength = (int*)lengths.GetUnsafePtr() + 0,
-                            dst = (float*)values.Slice(250, 250).GetUnsafePtr(),
-                            minRange = 0.0f,
-                            maxRange = 1.0f,
-                            compare = 0.0f,
-                            compareResultIfInRange = 0.0f,
-                            compareResultIfOutOfRange = 0.0f,
-                            normalize = 0.0f,
-                            scale = 1.0f,
-                            offset = 0.0f,
-                            processAsAbs = 0.0f
-                        },
-                        new Processor1D
-                        {
-                            src = (float*)values.Slice(500, 250).GetUnsafeReadOnlyPtr(),
-                            srcLength = (int*)lengths.GetUnsafePtr() + 1,
-                            dst = (float*)values.Slice(750, 250).GetUnsafePtr(),
-                            minRange = 0.0f,
-                            maxRange = 1.0f,
-                            compare = 0.0f,
-                            compareResultIfInRange = 0.0f,
-                            compareResultIfOutOfRange = 0.0f,
-                            normalize = 0.0f,
-                            scale = 1.0f,
-                            offset = 0.0f,
-                            processAsAbs = 0.0f
-                        }
+                        // new Processor1D
+                        // {
+                        //     src = (float*) values.Slice(0, 250).GetUnsafeReadOnlyPtr(),
+                        //     srcLength = (int*) lengths.GetUnsafePtr() + 0,
+                        //     dst = (float*) values.Slice(250, 250).GetUnsafePtr(),
+                        //     minRange = 0.0f,
+                        //     maxRange = 1.0f,
+                        //     compare = 0.0f,
+                        //     compareResultIfInRange = 0.0f,
+                        //     compareResultIfOutOfRange = 0.0f,
+                        //     normalize = 0.0f,
+                        //     scale = 1.0f,
+                        //     offset = 0.0f,
+                        //     processAsAbs = 0.0f
+                        // },
+                        // new Processor1D
+                        // {
+                        //     src = (float*) values.Slice(500, 250).GetUnsafeReadOnlyPtr(),
+                        //     srcLength = (int*) lengths.GetUnsafePtr() + 1,
+                        //     dst = (float*) values.Slice(750, 250).GetUnsafePtr(),
+                        //     minRange = 0.0f,
+                        //     maxRange = 1.0f,
+                        //     compare = 0.0f,
+                        //     compareResultIfInRange = 0.0f,
+                        //     compareResultIfOutOfRange = 0.0f,
+                        //     normalize = 0.0f,
+                        //     scale = 1.0f,
+                        //     offset = 0.0f,
+                        //     processAsAbs = 0.0f
+                        // }
                     },
                     Allocator.Persistent),
                 accumulate1Ds = new NativeArray<Accumulate1D>(new Accumulate1D[]
@@ -184,12 +245,23 @@ namespace UnityEngine.InputSystem.DmytroRnD
             // var t3 = dataset.timestamps.Slice();
             // var v3 = dataset.values.Slice();
             
+            Debug.Log($"{values[0]}");
+
             var sum = 0.0f;
             foreach (var t in values)
                 sum += t;
             outputvar = sum;
-            
+
             pipeline.Dispose();
+
+            mouseEvents.Dispose();
+            //mouseEventPointers.Dispose();
+            UnsafeUtility.Free(mouseEventPointers, Allocator.Persistent);
+            UnsafeUtility.Free(fields, Allocator.Persistent);
+            UnsafeUtility.Free(prevState, Allocator.Persistent);
+            UnsafeUtility.Free(changed, Allocator.Persistent);
+            UnsafeUtility.Free(dstFloatsData, Allocator.Persistent);
+            UnsafeUtility.Free(dstFloatsLengths, Allocator.Persistent);
 
             values.Dispose();
             lengths.Dispose();
