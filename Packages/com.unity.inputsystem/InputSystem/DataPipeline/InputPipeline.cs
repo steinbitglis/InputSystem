@@ -1,5 +1,6 @@
 ﻿using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Profiling;
 using UnityEngine.InputSystem.DataPipeline.Demux;
@@ -14,9 +15,14 @@ namespace UnityEngine.InputSystem.DataPipeline
     [BurstCompile]
     internal struct InputPipeline : IJob
     {
-        public NativeArray<DynamicDemuxer> dynamicDemuxers;
+        public Dataset dataset;
+        public DatasetPlanner datasetPlanner;
+        
+        public DynamicDemuxer dynamicDemuxer;
 
+        public NativeArray<float> enumsToFloatsLut;
         public NativeArray<EnumToFloat> enumsToFloats;
+
         public NativeArray<Vec2ToMagnitude> vec2sToMagnitudes;
 
         public NativeArray<Processor1D> process1Ds;
@@ -32,37 +38,33 @@ namespace UnityEngine.InputSystem.DataPipeline
         private static readonly ProfilerMarker s_MarkerAccumulate1D = new ProfilerMarker("Accumulate1D");
         private static readonly ProfilerMarker s_MarkerLatest1D = new ProfilerMarker("Latest1D");
 
-        public void Execute()
+        public unsafe void Execute()
         {
-            foreach (var op in dynamicDemuxers)
-                using (s_MarkerDynamicDemuxer.Auto())
-                    op.Execute();
-            
+            dynamicDemuxer.Execute();
+
             foreach (var op in enumsToFloats)
                 using (s_MarkerEnumToFloat.Auto())
-                    op.Execute();
+                    op.Execute(dataset, (float*)enumsToFloatsLut.GetUnsafePtr());
 
             foreach (var op in vec2sToMagnitudes)
                 using (s_MarkerVec2ToMagnitude.Auto())
-                    op.Execute();
+                    op.Execute(dataset);
 
             foreach (var op in process1Ds)
                 using (s_MarkerProcessor1D.Auto())
-                    op.Execute();
+                    op.Execute(dataset);
 
             foreach (var op in accumulate1Ds)
                 using (s_MarkerAccumulate1D.Auto())
-                    op.Execute();
+                    op.Execute(dataset);
 
             foreach (var op in latest1Ds)
                 using (s_MarkerLatest1D.Auto())
-                    op.Execute();
+                    op.Execute(dataset);
         }
 
         public void Dispose()
         {
-            dynamicDemuxers.Dispose();
-
             enumsToFloats.Dispose();
             vec2sToMagnitudes.Dispose();
 

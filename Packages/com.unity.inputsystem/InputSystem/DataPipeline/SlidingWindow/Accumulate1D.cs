@@ -5,25 +5,23 @@ using Unity.Collections;
 namespace UnityEngine.InputSystem.DataPipeline.SlidingWindow
 {
     [BurstCompile]
-    public unsafe struct Accumulate1D
+    public struct Accumulate1D
     {
-        [ReadOnly] [NoAlias] public float* src;
-
-        [ReadOnly] [NoAlias] public int* srcLength;
-
-        [WriteOnly] [NoAlias] public float* dst;
+        public StepFunction1D src, dst;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Execute()
+        public void Execute(Dataset dataset)
         {
-            var l = *srcLength;
+            var l = dataset.MapNToN(src, dst);
+            var v = dataset.GetValuesX(src);
+            var r = dataset.GetValuesX(dst);
 
             // TODO prefix sum on SIMD 
-            var value = 0.0f;
+            var acc = 0.0f;
             for (var i = 0; i < l; ++i)
             {
-                value += src[i];
-                dst[i] = value;
+                acc += v[i];
+                r[i] = acc;
             }
         }
     }

@@ -53,7 +53,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
         }
 
         public static float outputvar;
-        
+
         // allow padding in the end, so the size is != 30
         [StructLayout(LayoutKind.Explicit, Size = 32)]
         public struct NativeMouseStateTest
@@ -123,12 +123,12 @@ namespace UnityEngine.InputSystem.DmytroRnD
             // }
             */
 
-            
-            var mouseEvents = new NativeArray<NativeMouseStateTest>(1, Allocator.Persistent);
-            ((NativeMouseStateTest*)mouseEvents.GetUnsafePtr())[0].Position = new Vector2(3.5f, 2.0f);
 
-            var mouseEventPointers = (ulong**)UnsafeUtility.Malloc(8, 16, Allocator.Persistent);
-            mouseEventPointers[0] = (ulong*)mouseEvents.GetUnsafePtr();
+            var mouseEvents = new NativeArray<NativeMouseStateTest>(1, Allocator.Persistent);
+            ((NativeMouseStateTest*) mouseEvents.GetUnsafePtr())[0].Position = new Vector2(3.5f, 2.0f);
+
+            var mouseEventPointers = (ulong**) UnsafeUtility.Malloc(8, 16, Allocator.Persistent);
+            mouseEventPointers[0] = (ulong*) mouseEvents.GetUnsafePtr();
 
             var fields = (DataPipeline.Demux.DynamicDemuxer.Field*) UnsafeUtility.Malloc(
                 sizeof(DataPipeline.Demux.DynamicDemuxer.Field), 16, Allocator.Persistent);
@@ -147,12 +147,12 @@ namespace UnityEngine.InputSystem.DmytroRnD
 
             var values = new NativeArray<float>(1000, Allocator.Persistent);
             var lengths = new NativeArray<int>(2, Allocator.Persistent);
-            
+
             var dstFloatsData = (float**) UnsafeUtility.Malloc(8, 16, Allocator.Persistent);
             var dstFloatsLengths = (int**) UnsafeUtility.Malloc(8, 16, Allocator.Persistent);
 
-            dstFloatsData[0] = (float*)values.GetUnsafePtr() + 0;
-            dstFloatsLengths[0] = (int*)lengths.GetUnsafePtr() + 0;
+            dstFloatsData[0] = (float*) values.GetUnsafePtr() + 0;
+            dstFloatsLengths[0] = (int*) lengths.GetUnsafePtr() + 0;
 
             lengths[0] = 0;
             //lengths[1] = 250;
@@ -160,25 +160,21 @@ namespace UnityEngine.InputSystem.DmytroRnD
             // TODO raw pointers needs patching mechanism so we won't allocate input pipeline every frame
             var pipeline = new InputPipeline
             {
-                dynamicDemuxers = new NativeArray<DataPipeline.Demux.DynamicDemuxer>(new DataPipeline.Demux.DynamicDemuxer[]
-                    {
-                        new DataPipeline.Demux.DynamicDemuxer
-                        {
-                            fields = fields,
-                            fieldCount = 1,
-                            srcStructs = mouseEventPointers,
-                            srcStructCount = 1,
-                            srcStructLength = 4,
-                            prevState = prevState,
-                            gotFirst = false,
-                            changed = changed,
-                            dstFloatData = dstFloatsData,
-                            dstFloatLengths = dstFloatsLengths,
-                            dstIntData = null,
-                            dstIntLengths = null
-                        }
-                    },
-                    Allocator.Persistent),
+                dynamicDemuxer = new DataPipeline.Demux.DynamicDemuxer
+                {
+                    fields = fields,
+                    fieldCount = 1,
+                    srcStructs = mouseEventPointers,
+                    srcStructCount = 1,
+                    srcStructLength = 4,
+                    prevState = prevState,
+                    gotFirst = false,
+                    changed = changed,
+                    dstFloatData = dstFloatsData,
+                    dstFloatLengths = dstFloatsLengths,
+                    dstIntData = null,
+                    dstIntLengths = null
+                },
                 enumsToFloats = new NativeArray<EnumToFloat>(new EnumToFloat[]
                     {
                     },
@@ -244,7 +240,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
 
             // var t3 = dataset.timestamps.Slice();
             // var v3 = dataset.values.Slice();
-            
+
             Debug.Log($"{values[0]}");
 
             var sum = 0.0f;
@@ -255,6 +251,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
             pipeline.Dispose();
 
             mouseEvents.Dispose();
+
             //mouseEventPointers.Dispose();
             UnsafeUtility.Free(mouseEventPointers, Allocator.Persistent);
             UnsafeUtility.Free(fields, Allocator.Persistent);
@@ -295,6 +292,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
             //Graph.DropOldStates(Graph.MinTimestampAtCurrentUpdate); // min timestamp from last update 
 
             long? minTimestamp = null;
+
             long? maxTimestamp = null;
 
             // go over all the events
@@ -397,7 +395,7 @@ namespace UnityEngine.InputSystem.DmytroRnD
             }
 
             /*
-
+    
             // this is very sketchy at the moment, needs proper frame cursors instead
             // we need "cursor ahead of this one" abstraction here, not just adding 1ns blindly
             if (minTimestamp.HasValue)
@@ -409,14 +407,14 @@ namespace UnityEngine.InputSystem.DmytroRnD
                     Graph.MaxTimestampAtCurrentUpdate = Graph.MinTimestampAtCurrentUpdate;
                     Graph.NoUpdatesLastFrame = false;
                 }
-
+    
                 if (minTimestamp.Value < Graph.MaxTimestampAtCurrentUpdate)
                 {
                     var diff = Math.Abs(minTimestamp.Value - Graph.MaxTimestampAtCurrentUpdate);
                     Debug.LogError(
                         $"unstable input frame boundary clock {Graph.MaxTimestampAtCurrentUpdate} -> {minTimestamp.Value} diff {TimestampHelper.ConvertToSeconds(diff) * 1000000.0} us");
                 }
-
+    
                 Graph.MinTimestampAtCurrentUpdate = minTimestamp.Value;
                 Graph.MaxTimestampAtCurrentUpdate = maxTimestamp.Value;
             }
@@ -428,15 +426,15 @@ namespace UnityEngine.InputSystem.DmytroRnD
                 Graph.NoUpdatesLastFrame = true;
                 //Debug.Log("no events!");
             }
-
+    
             Graph.Compute();
-
+    
             if (Graph.DebugMouseLeftWasPressedThisFrame())
                 Debug.Log("was pressed");
             if (Graph.DebugMouseLeftWasReleasedThisFrame())
                 Debug.Log("was released");
                 
-
+    
             DebuggerWindow.RefreshCurrent();
                 */
 
@@ -450,20 +448,16 @@ namespace UnityEngine.InputSystem.DmytroRnD
 #endif
             // TODO disable me
             return;
-
             var deviceDescriptor = JsonUtility.FromJson<NativeDeviceDescriptor>(deviceDescriptorJson);
             Debug.Log($"DRND: device discovered {deviceId} -> {deviceDescriptorJson}");
-
             while (Devices.Length <= deviceId)
                 Array.Resize(ref Devices, Devices.Length + 1024);
-
             switch (deviceDescriptor.type)
             {
                 case "Mouse":
                     Devices[deviceId].Setup(deviceId, sizeof(NativeMouseState));
                     Graph.DeviceChannelOffsets[deviceId] =
                         0; // HACK, currently we just expect mouse to be first in the graph
-
                     break;
                 case "Keyboard":
                     Devices[deviceId].Setup(deviceId, sizeof(NativeKeyboardState));

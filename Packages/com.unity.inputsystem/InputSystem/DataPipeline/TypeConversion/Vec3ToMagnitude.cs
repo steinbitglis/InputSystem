@@ -6,6 +6,7 @@ using Unity.Profiling;
 
 namespace UnityEngine.InputSystem.DataPipeline.TypeConversion
 {
+    /*
     // Converts 3 dimensional vector to single float magnitude.
     // N->N conversion.
     [BurstCompile]
@@ -29,4 +30,5 @@ namespace UnityEngine.InputSystem.DataPipeline.TypeConversion
                 dst[i] = new Vector3(srcX[i], srcY[i], srcZ[i]).magnitude;
         }
     }
+    */
 }

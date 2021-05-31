@@ -11,20 +11,19 @@ namespace UnityEngine.InputSystem.DataPipeline.TypeConversion
     [BurstCompile]
     internal unsafe struct Vec2ToMagnitude
     {
-        [ReadOnly] [NoAlias] public float* srcX;
-    
-        [ReadOnly] [NoAlias] public float* srcY;
-    
-        [ReadOnly] public int* srcLength;
-    
-        [WriteOnly] [NoAlias] public float* dst;
-    
+        public StepFunction2D src;
+        public StepFunction1D dst;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Execute()
+        public void Execute(Dataset dataset)
         {
-            var l = *srcLength;
+            var l = dataset.MapNToN(src, dst);
+            var vx = dataset.GetValuesX(src);
+            var vy = dataset.GetValuesY(src);
+            var r = dataset.GetValuesX(dst);
+
             for (var i = 0; i < l; ++i)
-                dst[i] = new Vector2(srcX[i], srcY[i]).magnitude;
+                r[i] = new Vector2(vx[i], vy[i]).magnitude;
         }
     }
 }

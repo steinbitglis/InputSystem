@@ -10,13 +10,11 @@ namespace UnityEngine.InputSystem.DataPipeline.Processor
     // Processes single component value
     // N->N conversion.
     [BurstCompile]
-    internal unsafe struct Processor1D
+    internal struct Processor1D
     {
-        [ReadOnly] [NoAlias] public float* src;
+        //[ReadOnly] [NoAlias] public float* src;
 
-        [ReadOnly] public int* srcLength;
-
-        [WriteOnly] [NoAlias] public float* dst;
+        public StepFunction1D src, dst;
 
         // [minRange, maxRange] for clamp or compare 
         public float minRange, maxRange;
@@ -39,13 +37,15 @@ namespace UnityEngine.InputSystem.DataPipeline.Processor
         public float processAsAbs;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Execute()
+        public void Execute(Dataset dataset)
         {
-            var l = *srcLength;
+            var l = dataset.MapNToN(src, dst);
+            var v = dataset.GetValuesX(src);
+            var r = dataset.GetValuesX(dst);
 
             for (var i = 0; i < l; ++i)
             {
-                var v0 = src[i];
+                var v0 = v[i];
 
                 // branchless conditional abs
                 var v1 = Mathf.LerpUnclamped(v0, (v0 < 0.0f ? -v0 : v0), processAsAbs);
@@ -67,7 +67,7 @@ namespace UnityEngine.InputSystem.DataPipeline.Processor
                 // FMA
                 var v5 = v4 * scale + offset;
 
-                dst[i] = v5;
+                r[i] = v5;
             }
         }
     }
