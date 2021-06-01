@@ -5,7 +5,6 @@ using Unity.Collections;
 
 namespace UnityEngine.InputSystem.DataPipeline.Demux
 {
-    [BurstCompile]
     public unsafe struct DynamicDemuxer
     {
         public enum SourceDataType
@@ -134,10 +133,5 @@ namespace UnityEngine.InputSystem.DataPipeline.Demux
         }
 
 
-        [BurstCompile]
-        public static void Execute(DynamicDemuxer* op)
-        {
-            op->Execute();
-        }
     }
 }

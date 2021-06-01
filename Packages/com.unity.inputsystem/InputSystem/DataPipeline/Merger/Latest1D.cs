@@ -9,10 +9,15 @@ namespace UnityEngine.InputSystem.DataPipeline.Merger
 {
     // Merges two 1D slices into one 1D slice in order of timestamps.
     // x(N)+y(M)->z(N+M) conversion.
-    [BurstCompile]
     public struct Latest1D
     {
         public StepFunction1D src1, src2, dst;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Map(Dataset dataset)
+        {
+            dataset.MapNAndMToNPlusM(src1, src2, dst);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Execute(Dataset dataset)

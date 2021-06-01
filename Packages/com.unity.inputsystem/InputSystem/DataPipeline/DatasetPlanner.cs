@@ -4,6 +4,7 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace UnityEngine.InputSystem.DataPipeline
 {
+    /*
     // helper class to calculate and manage memory allocation for the dataset
     [BurstCompile]
     public unsafe struct DatasetPlanner
@@ -17,9 +18,11 @@ namespace UnityEngine.InputSystem.DataPipeline
             NAndMToNPlusM
         }
         
+        // TODO can also of this be based on all kernels we have?
+        
         public struct IngressStepFunctions
         {
-            public int src;
+            public IStepFunctionWithActuationNotion test;
             public int srcOpaqueValueStride;
         }
 
@@ -31,11 +34,18 @@ namespace UnityEngine.InputSystem.DataPipeline
             public int dstOpaqueValueStride;
         }
 
+        // public struct DatasetAllocationPlan
+        // {
+        //     var timestampsCount = 0;
+        //     var valuesCount = 0;
+        //     var opaqueValuesBytes = 0;
+        // }
+
         public NativeArray<IngressStepFunctions> ingress;
         public NativeArray<StepsFunctionDependency> dependencies;
 
         [BurstCompile]
-        public Dataset PlanAndAllocate(Dataset dataset)
+        public Dataset Plan(Dataset dataset)
         {
             var timestampsCount = 0;
             var valuesCount = 0;
@@ -82,6 +92,7 @@ namespace UnityEngine.InputSystem.DataPipeline
                 }
             }
 
+            // TODO move allocation to dataset
             if (timestampsCount > dataset.timestampsAllocCount)
             {
                 UnsafeUtility.Free(dataset.timestamps, Allocator.Persistent);
@@ -105,8 +116,8 @@ namespace UnityEngine.InputSystem.DataPipeline
                 dataset.valuesOpaque = UnsafeUtility.Malloc(opaqueValuesBytes, 16, Allocator.Persistent);
                 dataset.valuesOpaqueAllocSize = opaqueValuesBytes;
             }
-
             return dataset;
         }
     }
+    */
 }

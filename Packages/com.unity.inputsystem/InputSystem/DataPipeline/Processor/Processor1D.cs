@@ -9,7 +9,6 @@ namespace UnityEngine.InputSystem.DataPipeline.Processor
 {
     // Processes single component value
     // N->N conversion.
-    [BurstCompile]
     internal struct Processor1D
     {
         //[ReadOnly] [NoAlias] public float* src;
@@ -35,6 +34,12 @@ namespace UnityEngine.InputSystem.DataPipeline.Processor
 
         // if 1.0f value is converted to absolute value before processing and converted back to signed afterwards
         public float processAsAbs;
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Map(Dataset dataset)
+        {
+            dataset.MapNToN(src, dst);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Execute(Dataset dataset)

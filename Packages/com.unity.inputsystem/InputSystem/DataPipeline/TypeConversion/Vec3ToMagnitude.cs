@@ -9,7 +9,6 @@ namespace UnityEngine.InputSystem.DataPipeline.TypeConversion
     /*
     // Converts 3 dimensional vector to single float magnitude.
     // N->N conversion.
-    [BurstCompile]
     internal unsafe struct Vec3ToMagnitude
     {
         [ReadOnly] [NoAlias] public float* srcX;

@@ -123,6 +123,17 @@ namespace UnityEngine.InputSystem.DmytroRnD
             // }
             */
 
+            var datasetAllocator = new DatasetAllocator();
+            datasetAllocator.InitialConfiguration();
+            datasetAllocator.Reconfigure(new DatasetAllocator.Config
+            {
+                timestampAxesCount = 1,
+                valuesAxesCount = 1,
+                opaqueValuesAxesCount = 1,
+                timestampsCount = 1,
+                valuesCount = 1,
+                opaqueValuesBytes = 0
+            });
 
             var mouseEvents = new NativeArray<NativeMouseStateTest>(1, Allocator.Persistent);
             ((NativeMouseStateTest*) mouseEvents.GetUnsafePtr())[0].Position = new Vector2(3.5f, 2.0f);
@@ -157,24 +168,26 @@ namespace UnityEngine.InputSystem.DmytroRnD
             lengths[0] = 0;
             //lengths[1] = 250;
 
-            // TODO raw pointers needs patching mechanism so we won't allocate input pipeline every frame
+            /*
             var pipeline = new InputPipeline
             {
-                dynamicDemuxer = new DataPipeline.Demux.DynamicDemuxer
-                {
-                    fields = fields,
-                    fieldCount = 1,
-                    srcStructs = mouseEventPointers,
-                    srcStructCount = 1,
-                    srcStructLength = 4,
-                    prevState = prevState,
-                    gotFirst = false,
-                    changed = changed,
-                    dstFloatData = dstFloatsData,
-                    dstFloatLengths = dstFloatsLengths,
-                    dstIntData = null,
-                    dstIntLengths = null
-                },
+                datasetAllocator = datasetAllocator,
+                // dynamicDemuxer = new DataPipeline.Demux.DynamicDemuxer
+                // {
+                //     fields = fields,
+                //     fieldCount = 1,
+                //     srcStructs = mouseEventPointers,
+                //     srcStructCount = 1,
+                //     srcStructLength = 4,
+                //     prevState = prevState,
+                //     gotFirst = false,
+                //     changed = changed,
+                //     dstFloatData = dstFloatsData,
+                //     dstFloatLengths = dstFloatsLengths,
+                //     dstIntData = null,
+                //     dstIntLengths = null
+                // },
+                enumsToFloatsLut = new NativeArray<float>(0, Unity.Collections.Allocator.Persistent),
                 enumsToFloats = new NativeArray<EnumToFloat>(new EnumToFloat[]
                     {
                     },
@@ -227,7 +240,16 @@ namespace UnityEngine.InputSystem.DmytroRnD
                     Allocator.Persistent)
             };
 
-            pipeline.Run();
+            try
+            {
+                pipeline.Run();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+            */
 
             //pipeline.Run(null, null);
             //pipeline.processor1D.Schedule().Complete();
@@ -247,8 +269,10 @@ namespace UnityEngine.InputSystem.DmytroRnD
             foreach (var t in values)
                 sum += t;
             outputvar = sum;
+            
+            datasetAllocator.Dispose();
 
-            pipeline.Dispose();
+            //pipeline.Dispose();
 
             mouseEvents.Dispose();
 

@@ -8,11 +8,16 @@ namespace UnityEngine.InputSystem.DataPipeline.TypeConversion
 {
     // Converts 2 dimensional vector to single float magnitude.
     // N->N conversion.
-    [BurstCompile]
-    internal unsafe struct Vec2ToMagnitude
+    internal struct Vec2ToMagnitude
     {
         public StepFunction2D src;
         public StepFunction1D dst;
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Map(Dataset dataset)
+        {
+            dataset.MapNToN(src, dst);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Execute(Dataset dataset)
