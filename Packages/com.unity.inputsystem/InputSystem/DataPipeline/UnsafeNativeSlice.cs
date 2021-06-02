@@ -6,7 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace UnityEngine.InputSystem.DataPipeline
 {
     // Can't use NativeSlice because Dataset is passed around as an argument, so it has to be a non-managed type.
-    // All memory ownership is done on root level, so nuking safety handles from slices should be safe enough ish.
+    // All memory ownership is done on root level, so nuking safety handles from slices should be safe-enough-ish.
     public unsafe struct UnsafeNativeSlice<T> where T : struct
     {
         [NativeDisableUnsafePtrRestriction] [NoAlias]

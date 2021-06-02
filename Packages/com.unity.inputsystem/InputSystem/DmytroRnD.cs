@@ -6,6 +6,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
+using UnityEditor;
 //using UnityEditorInternal;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.Profiling;
@@ -70,7 +71,22 @@ namespace UnityEngine.InputSystem.DmytroRnD
 
         internal static unsafe void NativeUpdate(NativeInputUpdateType updateType, NativeInputEventBuffer* buffer)
         {
-            //return;
+            var array = new UnsafeResizableNativeArray();
+            array.Alloc(1024);
+            
+            // var job = new TestJob
+            // {
+            //     array = array
+            // };
+            //
+            // if (EditorApplication.isPlaying)
+            //     job.Run();
+            // else
+            //     job.Execute();
+            //
+            // array.Dispose();
+            
+            return;
 
             Profiler.BeginSample("Core.NativeUpdate");
 
