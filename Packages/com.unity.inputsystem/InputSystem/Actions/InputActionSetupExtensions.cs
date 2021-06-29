@@ -730,11 +730,11 @@ namespace UnityEngine.InputSystem
             match.action = action.name;
 
             var actionMap = action.GetOrCreateActionMap();
-            var bindingIndex = actionMap.FindBinding(match, out _);
-            if (bindingIndex == -1)
+            var bindingIndexInMap = actionMap.FindBindingRelativeToMap(match);
+            if (bindingIndexInMap == -1)
                 return default;
 
-            return new BindingSyntax(actionMap, bindingIndex);
+            return new BindingSyntax(actionMap, bindingIndexInMap);
         }
 
         /// <summary>
@@ -1423,6 +1423,40 @@ namespace UnityEngine.InputSystem
                 return default;
             }
 
+            /// <summary>
+            /// Remove part bindings from a composite binding.
+            /// </summary>
+            /// <remarks>
+            /// If the binding is not a composite (see <see cref="InputBinding.isComposite"/>), nothing
+            /// will be removed, and an invalid BindingSyntax is returned.
+            /// </remarks>
+            /// <exception cref="InvalidOperationException">The instance is not <see cref="valid"/>.</exception>
+            public BindingSyntax ClearPartBindings () {
+                if (!valid)
+                    throw new InvalidOperationException("Instance not valid");
+
+                ref var bindings = ref m_ActionMap.m_Bindings;
+                var index = m_BindingIndexInMap;
+
+                if (!bindings[index].isComposite)
+                    return default;
+
+                index++; // Skip to first part binding
+
+                while (index < bindings.Length && bindings[index].isPartOfComposite)
+                    ArrayHelpers.EraseAt(ref bindings, index);
+
+                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.LazyResolveBindings();
+
+                // We have switched to a different binding array. For singleton actions, we need to
+                // sync up the reference that the action itself has.
+                if (m_ActionMap.m_SingletonAction != null)
+                    m_ActionMap.m_SingletonAction.m_SingletonActionBindings = bindings;
+
+                return this;
+            }
+
             ////TODO: allow setting overrides through this accessor
 
             /// <summary>
@@ -1471,8 +1505,9 @@ namespace UnityEngine.InputSystem
                 if (!binding.isPartOfComposite && !binding.isComposite)
                     throw new InvalidOperationException("Binding accessor must point to composite or part binding");
 
+                var bindingAction = m_ActionMap.m_Bindings[m_BindingIndexInMap].action;
                 AddBindingInternal(m_ActionMap,
-                    new InputBinding { path = path, isPartOfComposite = true, name = partName },
+                    new InputBinding { path = path, isPartOfComposite = true, name = partName, action = bindingAction },
                     m_BindingIndexInMap + 1);
 
                 return new BindingSyntax(m_ActionMap, m_BindingIndexInMap + 1, m_Action);
