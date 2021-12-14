@@ -1467,7 +1467,7 @@ namespace UnityEngine.InputSystem
                 while (index < bindings.Length && bindings[index].isPartOfComposite)
                     ArrayHelpers.EraseAt(ref bindings, index);
 
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
 
                 // We have switched to a different binding array. For singleton actions, we need to
