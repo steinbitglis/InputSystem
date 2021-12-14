@@ -308,8 +308,8 @@ namespace UnityEngine.InputSystem
         /// <seealso cref="InputAction.canceled"/>
         public event Action<InputAction.CallbackContext> actionTriggered
         {
-            add => m_ActionCallbacks.AppendWithCapacity(value);
-            remove => m_ActionCallbacks.RemoveByMovingTailWithCapacity(value); ////FIXME: Changes callback ordering.
+            add => m_ActionCallbacks.AddCallback(value);
+            remove => m_ActionCallbacks.RemoveCallback(value);
         }
 
         public InputActionMap()
@@ -355,6 +355,9 @@ namespace UnityEngine.InputSystem
             if (m_Actions == null)
                 return -1;
 
+            // First time we hit this method, we populate the lookup table.
+            SetUpActionLookupTable();
+
             var actionCount = m_Actions.Length;
 
             var isOldBracedFormat = nameOrId.StartsWith("{") && nameOrId.EndsWith("}");
@@ -368,6 +371,9 @@ namespace UnityEngine.InputSystem
                 }
             }
 
+            if (m_ActionIndexByNameOrId.TryGetValue(nameOrId, out var actionIndex))
+                return actionIndex;
+
             for (var i = 0; i < actionCount; ++i)
             {
                 var action = m_Actions[i];
@@ -376,6 +382,35 @@ namespace UnityEngine.InputSystem
             }
 
             return InputActionState.kInvalidIndex;
+        }
+
+        private void SetUpActionLookupTable()
+        {
+            if (m_ActionIndexByNameOrId != null || m_Actions == null)
+                return;
+
+            m_ActionIndexByNameOrId = new Dictionary<string, int>();
+
+            var actionCount = m_Actions.Length;
+            for (var i = 0; i < actionCount; ++i)
+            {
+                var action = m_Actions[i];
+
+                // We want to make sure an action ID cannot change *after* we have created the table.
+                // NOTE: The *name* of an action, however, *may* change.
+                action.MakeSureIdIsInPlace();
+
+                // We create two lookup paths for each action:
+                // (1) By case-sensitive name.
+                // (2) By GUID string.
+                m_ActionIndexByNameOrId[action.name] = i;
+                m_ActionIndexByNameOrId[action.m_Id] = i;
+            }
+        }
+
+        internal void ClearActionLookupTable()
+        {
+            m_ActionIndexByNameOrId?.Clear();
         }
 
         private int FindActionIndex(Guid id)
@@ -663,10 +698,13 @@ namespace UnityEngine.InputSystem
         /// isn't, we create a separate array with the bindings sorted by action and have each action reference
         /// a slice through <see cref="InputAction.m_BindingsStartIndex"/> and <see cref="InputAction.m_BindingsCount"/>.
         /// </remarks>
-        /// <seealso cref="SetUpPerActionCachedBindingData"/>
+        /// <seealso cref="SetUpPerActionControlAndBindingArrays"/>
         [NonSerialized] private InputBinding[] m_BindingsForEachAction;
 
         [NonSerialized] private InputControl[] m_ControlsForEachAction;
+
+        [NonSerialized] private bool m_ControlsForEachActionInitialized;
+        [NonSerialized] private bool m_BindingsForEachActionInitialized;
 
         /// <summary>
         /// Number of actions currently enabled in the map.
@@ -695,7 +733,9 @@ namespace UnityEngine.InputSystem
 
         [NonSerialized] internal DeviceArray m_Devices;
 
-        [NonSerialized] internal InlinedArray<Action<InputAction.CallbackContext>> m_ActionCallbacks;
+        [NonSerialized] internal CallbackArray<Action<InputAction.CallbackContext>> m_ActionCallbacks;
+
+        [NonSerialized] internal Dictionary<string, int> m_ActionIndexByNameOrId;
 
         internal static int s_DeferBindingResolution;
 
@@ -780,8 +820,8 @@ namespace UnityEngine.InputSystem
             Debug.Assert(!action.isSingletonAction || m_SingletonAction == action, "Action is not a singleton action");
 
             // See if we need to refresh.
-            if (m_BindingsForEachAction == null)
-                SetUpPerActionCachedBindingData();
+            if (!m_BindingsForEachActionInitialized)
+                SetUpPerActionControlAndBindingArrays();
 
             return new ReadOnlyArray<InputBinding>(m_BindingsForEachAction, action.m_BindingsStartIndex,
                 action.m_BindingsCount);
@@ -796,8 +836,8 @@ namespace UnityEngine.InputSystem
             Debug.Assert(action.m_ActionMap == this);
             Debug.Assert(!action.isSingletonAction || m_SingletonAction == action);
 
-            if (m_ControlsForEachAction == null)
-                SetUpPerActionCachedBindingData();
+            if (!m_ControlsForEachActionInitialized)
+                SetUpPerActionControlAndBindingArrays();
 
             return new ReadOnlyArray<InputControl>(m_ControlsForEachAction, action.m_ControlStartIndex,
                 action.m_ControlCount);
@@ -815,11 +855,17 @@ namespace UnityEngine.InputSystem
         /// controls yet (i.e. <see cref="m_State"/> is <c>null</c>). Otherwise, using <see cref="InputAction.bindings"/>
         /// may trigger a control resolution which would be surprising.
         /// </remarks>
-        private unsafe void SetUpPerActionCachedBindingData()
+        private unsafe void SetUpPerActionControlAndBindingArrays()
         {
             // Handle case where we don't have any bindings.
             if (m_Bindings == null)
+            {
+                m_ControlsForEachAction = null;
+                m_BindingsForEachAction = null;
+                m_ControlsForEachActionInitialized = true;
+                m_BindingsForEachActionInitialized = true;
                 return;
+            }
 
             if (m_SingletonAction != null)
             {
@@ -836,6 +882,25 @@ namespace UnityEngine.InputSystem
                 m_SingletonAction.m_BindingsCount = m_Bindings.Length;
                 m_SingletonAction.m_ControlStartIndex = 0;
                 m_SingletonAction.m_ControlCount = m_State?.totalControlCount ?? 0;
+
+                // Only complication, InputActionState allows a control to appear multiple times
+                // on the same action and InputAction.controls[] doesn't.
+                if (m_ControlsForEachAction.HaveDuplicateReferences(0, m_SingletonAction.m_ControlCount))
+                {
+                    var numControls = 0;
+                    var controls = new InputControl[m_SingletonAction.m_ControlCount];
+                    for (var i = 0; i < m_SingletonAction.m_ControlCount; ++i)
+                    {
+                        if (!controls.ContainsReference(m_ControlsForEachAction[i]))
+                        {
+                            controls[numControls] = m_ControlsForEachAction[i];
+                            ++numControls;
+                        }
+                    }
+
+                    m_ControlsForEachAction = controls;
+                    m_SingletonAction.m_ControlCount = numControls;
+                }
             }
             else
             {
@@ -943,17 +1008,27 @@ namespace UnityEngine.InputSystem
                         // but do not really resolve to controls themselves).
                         if (m_State != null && !m_Bindings[sourceBindingToCopy].isComposite)
                         {
-                            var controlCountForBinding = m_State
-                                .bindingStates[mapIndices.bindingStartIndex + sourceBindingToCopy].controlCount;
+                            ref var bindingState = ref m_State.bindingStates[mapIndices.bindingStartIndex + sourceBindingToCopy];
+
+                            var controlCountForBinding = bindingState.controlCount;
                             if (controlCountForBinding > 0)
                             {
-                                Array.Copy(m_State.controls,
-                                    m_State.bindingStates[mapIndices.bindingStartIndex + sourceBindingToCopy]
-                                        .controlStartIndex,
-                                    m_ControlsForEachAction, currentControlIndex, controlCountForBinding);
+                                // Internally, we allow several bindings on a given action to resolve to the same control.
+                                // Externally, however, InputAction.controls[] is a set and thus should not contain duplicates.
+                                // So, instead of just doing a straight copy here, we copy controls one by one.
 
-                                currentControlIndex += controlCountForBinding;
-                                currentAction.m_ControlCount += controlCountForBinding;
+                                var controlStartIndexForBinding = bindingState.controlStartIndex;
+                                for (var n = 0; n < controlCountForBinding; ++n)
+                                {
+                                    var control = m_State.controls[controlStartIndexForBinding + n];
+                                    if (!m_ControlsForEachAction.ContainsReference(currentAction.m_ControlStartIndex,
+                                        currentAction.m_ControlCount, control))
+                                    {
+                                        m_ControlsForEachAction[currentControlIndex] = control;
+                                        ++currentControlIndex;
+                                        ++currentAction.m_ControlCount;
+                                    }
+                                }
                             }
                         }
 
@@ -974,13 +1049,19 @@ namespace UnityEngine.InputSystem
                     m_BindingsForEachAction = newBindingsArray;
                 }
             }
+
+            m_ControlsForEachActionInitialized = true;
+            m_BindingsForEachActionInitialized = true;
         }
 
         ////TODO: re-use allocations such that only grow the arrays and hit zero GC allocs when we already have enough memory
-        internal void ClearPerActionCachedBindingData()
+        internal void ClearCachedActionData()
         {
-            m_BindingsForEachAction = null;
-            m_ControlsForEachAction = null;
+            m_BindingsForEachActionInitialized = default;
+            m_ControlsForEachActionInitialized = default;
+            m_BindingsForEachAction = default;
+            m_ControlsForEachAction = default;
+            m_ActionIndexByNameOrId = default;
         }
 
         internal void GenerateId()
@@ -996,6 +1077,7 @@ namespace UnityEngine.InputSystem
         {
             // Clear cached controls for actions. Don't need to necessarily clear m_BindingsForEachAction.
             m_ControlsForEachAction = null;
+            m_ControlsForEachActionInitialized = false;
 
             // If we haven't had to resolve bindings yet, we can wait until when we
             // actually have to.
@@ -1056,6 +1138,8 @@ namespace UnityEngine.InputSystem
         /// </remarks>
         internal void ResolveBindings()
         {
+            m_ControlsForEachActionInitialized = false;
+
             // Make sure that if we trigger callbacks as part of disabling and re-enabling actions,
             // we don't trigger a re-resolve while we're already resolving bindings.
             using (InputActionRebindingExtensions.DeferBindingResolution())
@@ -1167,6 +1251,7 @@ namespace UnityEngine.InputSystem
 
                         ////TODO: determine whether we really need to wipe this; keep them if nothing has changed
                         map.m_ControlsForEachAction = null;
+                        map.m_ControlsForEachActionInitialized = false;
 
                         if (map.m_SingletonAction != null)
                             InputActionState.NotifyListenersOfActionChange(InputActionChange.BoundControlsChanged, map.m_SingletonAction);
@@ -1193,26 +1278,48 @@ namespace UnityEngine.InputSystem
         /// <inheritdoc/>
         public int FindBinding(InputBinding mask, out InputAction action)
         {
-            var n = FindBindingRelativeToMap(mask);
-            if (n == -1) {
+            var index = FindBindingRelativeToMap(mask);
+            if (index == -1)
+            {
                 action = null;
                 return -1;
             }
 
-            action = m_SingletonAction ?? FindAction(bindings[n].action);
-            return action.BindingIndexOnMapToBindingIndexOnAction(n);
+            action = m_SingletonAction ?? FindAction(bindings[index].action);
+            return action.BindingIndexOnMapToBindingIndexOnAction(index);
         }
 
-        public int FindBindingRelativeToMap(InputBinding mask)
+        /// <summary>
+        /// Find the index of the first binding that matches the given mask.
+        /// </summary>
+        /// <param name="mask">A binding. See <see cref="InputBinding.Matches"/> for details.</param>
+        /// <returns>Index into <see cref="InputAction.bindings"/> of <paramref name="action"/> of the binding
+        /// that matches <paramref name="mask"/>. If no binding matches, will return -1.</returns>
+        /// <remarks>
+        /// For details about matching bindings by a mask, see <see cref="InputBinding.Matches"/>.
+        ///
+        /// <example>
+        /// <code>
+        /// var index = playerInput.actions.FindBindingRelativeToMap(
+        ///     new InputBinding { path = "&lt;Gamepad&gt;/buttonSouth" });
+        ///
+        /// if (index != -1)
+        ///     Debug.Log($"Found binding with index {index}");
+        /// </code>
+        /// </example>
+        /// </remarks>
+        /// <seealso cref="InputBinding.Matches"/>
+        /// <seealso cref="bindings"/>
+        internal int FindBindingRelativeToMap(InputBinding mask)
         {
             var bindings = m_Bindings;
             var bindingsCount = bindings.LengthSafe();
 
-            for (var n = 0; n < bindingsCount; ++n)
+            for (var i = 0; i < bindingsCount; ++i)
             {
-                ref var binding = ref bindings[n];
+                ref var binding = ref bindings[i];
                 if (mask.Matches(ref binding))
-                    return n;
+                    return i;
             }
 
             return -1;
@@ -1354,6 +1461,7 @@ namespace UnityEngine.InputSystem
                         : null,
                     m_Processors = processors,
                     m_Interactions = interactions,
+                    wantsInitialStateCheck = initialStateCheck,
                 };
             }
         }
@@ -1367,6 +1475,7 @@ namespace UnityEngine.InputSystem
             public string expectedControlType;
             public string processors;
             public string interactions;
+            public bool initialStateCheck;
 
             public static WriteActionJson FromAction(InputAction action)
             {
@@ -1378,6 +1487,7 @@ namespace UnityEngine.InputSystem
                     expectedControlType = action.m_ExpectedControlType,
                     processors = action.processors,
                     interactions = action.interactions,
+                    initialStateCheck = action.wantsInitialStateCheck,
                 };
             }
         }
@@ -1753,7 +1863,8 @@ namespace UnityEngine.InputSystem
 
             // Make sure we don't retain any cached per-action data when using serialization
             // to doctor around in action map configurations in the editor.
-            ClearPerActionCachedBindingData();
+            ClearCachedActionData();
+            ClearActionLookupTable();
         }
 
         #endregion

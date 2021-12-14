@@ -12,7 +12,6 @@ namespace UnityEngine.InputSystem.Controls
     /// Can optionally be configured to perform normalization.
     /// Stored as either a float, a short, a byte, or a single bit.
     /// </remarks>
-    [Scripting.Preserve]
     public class AxisControl : InputControl<float>
     {
         /// <summary>
@@ -198,6 +197,19 @@ namespace UnityEngine.InputSystem.Controls
             return value;
         }
 
+        private float Unpreprocess(float value)
+        {
+            // Does not reverse the effect of clamping (we don't know what the unclamped value should be).
+
+            if (invert)
+                value *= -1f;
+            if (normalize)
+                value = NormalizeProcessor.Denormalize(value, normalizeMin, normalizeMax, normalizeZero);
+            if (scale)
+                value /= scaleFactor;
+            return value;
+        }
+
         /// <summary>
         /// Default-initialize the control.
         /// </summary>
@@ -230,6 +242,7 @@ namespace UnityEngine.InputSystem.Controls
         /// <inheritdoc />
         public override unsafe void WriteValueIntoState(float value, void* statePtr)
         {
+            value = Unpreprocess(value);
             stateBlock.WriteFloat(statePtr, value);
         }
 

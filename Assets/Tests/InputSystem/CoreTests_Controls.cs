@@ -317,6 +317,36 @@ partial class CoreTests
             Is.EqualTo(new AxisDeadzoneProcessor().Process(0.5f)));
     }
 
+    // https://fogbugz.unity3d.com/f/cases/1336240/
+    [Test]
+    [Category("Controls")]
+    public void Controls_CanWriteIntoHalfAxesOfSticks()
+    {
+        // Disable deadzoning.
+        InputSystem.settings.defaultDeadzoneMax = 1;
+        InputSystem.settings.defaultDeadzoneMin = 0;
+
+        var gamepad = InputSystem.AddDevice<Gamepad>();
+
+        Set(gamepad.leftStick.left, 1f);
+
+        Assert.That(gamepad.leftStick.ReadValue(), Is.EqualTo(Vector2.left));
+
+        // Set "right" to 1 as well. This is a conflicting state. Result should
+        // be that left is 0 and right is 1.
+        Set(gamepad.leftStick.right, 1f);
+
+        Assert.That(gamepad.leftStick.ReadValue(), Is.EqualTo(Vector2.right));
+
+        Set(gamepad.leftStick.up, 1f);
+
+        Assert.That(gamepad.leftStick.ReadValue(), Is.EqualTo((Vector2.right + Vector2.up).normalized));
+
+        Set(gamepad.leftStick.down, 1f);
+
+        Assert.That(gamepad.leftStick.ReadValue(), Is.EqualTo((Vector2.right + Vector2.down).normalized));
+    }
+
     [Test]
     [Category("Controls")]
     public void Controls_CanEvaluateMagnitude()
@@ -1004,6 +1034,77 @@ partial class CoreTests
 
     [Test]
     [Category("Controls")]
+    public void Controls_CanDetermineIfControlIsPressed()
+    {
+        InputSystem.settings.defaultButtonPressPoint = 0.5f;
+
+        var gamepad = InputSystem.AddDevice<Gamepad>();
+
+        Set(gamepad.leftStick, Vector2.one);
+        Set(gamepad.leftTrigger, 0.6f);
+        Press(gamepad.buttonSouth);
+
+        //// https://jira.unity3d.com/browse/ISX-926
+        ////REVIEW: IsPressed() should probably be renamed. As is apparent from the calls here, it's not always
+        ////        readily apparent that the way it is defined ("actuation level at least at button press threshold")
+        ////        does not always connect to what it intuitively means for the specific control.
+
+        Assert.That(gamepad.leftTrigger.IsPressed(), Is.True);
+        Assert.That(gamepad.rightTrigger.IsPressed(), Is.False);
+        Assert.That(gamepad.buttonSouth.IsPressed(), Is.True);
+        Assert.That(gamepad.buttonNorth.IsPressed(), Is.False);
+        Assert.That(gamepad.leftStick.IsPressed(), Is.True); // Note how this diverges from the actual meaning of "is the left stick pressed?"
+        Assert.That(gamepad.rightStick.IsPressed(), Is.False);
+
+        // https://fogbugz.unity3d.com/f/cases/1374024/
+        // Calling it on the entire device should be false.
+        Assert.That(gamepad.IsPressed(), Is.False);
+    }
+
+    [Test]
+    [Category("Controls")]
+    public void Controls_CanCustomizeDefaultButtonPressPoint()
+    {
+        var gamepad = InputSystem.AddDevice<Gamepad>();
+
+        InputSystem.settings.defaultButtonPressPoint = 0.4f;
+
+        Set(gamepad.leftTrigger, 0.39f);
+
+        Assert.That(gamepad.leftTrigger.isPressed, Is.False);
+
+        Set(gamepad.leftTrigger, 0.4f);
+
+        Assert.That(gamepad.leftTrigger.isPressed, Is.True);
+
+        InputSystem.settings.defaultButtonPressPoint = 0.5f;
+
+        Assert.That(gamepad.leftTrigger.isPressed, Is.False);
+
+        InputSystem.settings.defaultButtonPressPoint = 0;
+
+        Assert.That(gamepad.leftTrigger.isPressed, Is.True);
+
+        // Setting the trigger to 0 requires the system to be "smart" enough to
+        // figure out that 0 as a default button press point doesn't make sense
+        // and that instead the press point should clamp off at some low, non-zero value.
+        // https://fogbugz.unity3d.com/f/cases/1349002/
+        Set(gamepad.leftTrigger, 0f);
+
+        Assert.That(gamepad.leftTrigger.isPressed, Is.False);
+
+        Set(gamepad.leftTrigger, 0.001f);
+
+        Assert.That(gamepad.leftTrigger.isPressed, Is.True);
+
+        InputSystem.settings.defaultButtonPressPoint = -1;
+        Set(gamepad.leftTrigger, 0f);
+
+        Assert.That(gamepad.leftTrigger.isPressed, Is.False);
+    }
+
+    [Test]
+    [Category("Controls")]
     public void Controls_CanCustomizePressPointOfGamepadTriggers()
     {
         var json = @"
@@ -1061,9 +1162,6 @@ partial class CoreTests
 
     [Test]
     [Category("Controls")]
-#if UNITY_ANDROID && !UNITY_EDITOR
-    [Ignore("Case 1254559")]
-#endif
     public void Controls_CanTurnControlPathIntoHumanReadableText()
     {
         Assert.That(InputControlPath.ToHumanReadableString("*/{PrimaryAction}"), Is.EqualTo("PrimaryAction [Any]"));
@@ -1105,7 +1203,6 @@ partial class CoreTests
         Assert.That(InputControlPath.ToHumanReadableString("<Keyboard>/a", control: Keyboard.current), Is.EqualTo("Q [Keyboard]"));
     }
 
-    [Preserve]
     private class DeviceWithoutAnyControls : InputDevice
     {
     }

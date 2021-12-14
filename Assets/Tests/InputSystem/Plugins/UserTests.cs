@@ -1049,6 +1049,41 @@ internal class UserTests : CoreTestsFixture
         }));
     }
 
+    // Designed to cause indexing problems in InputUser code, see report/contrib:
+    // https://github.com/Unity-Technologies/InputSystem/pull/1359
+    [Test]
+    [Category("Users")]
+    public void Users_CanReacquireDevicesIfSingleDeviceIsPairedWithMultipleUsers()
+    {
+        // Arrange: Setup three users sharing a single device
+        var user1 = InputUser.CreateUserWithoutPairedDevices();
+        var user2 = InputUser.CreateUserWithoutPairedDevices();
+        var user3 = InputUser.CreateUserWithoutPairedDevices();
+
+        var keyboard = InputSystem.AddDevice<Keyboard>("keyboard");
+
+        InputUser.PerformPairingWithDevice(keyboard, user1);
+        InputUser.PerformPairingWithDevice(keyboard, user2);
+        InputUser.PerformPairingWithDevice(keyboard, user3);
+
+        // Act: device is lost and goes back to being available
+        InputSystem.RemoveDevice(keyboard);
+        InputSystem.AddDevice(keyboard);
+
+        // Assert: Lost devices are reacquired
+        Assert.That(user1.lostDevices, Is.Empty);
+        Assert.That(user2.lostDevices, Is.Empty);
+        Assert.That(user3.lostDevices, Is.Empty);
+
+        Assert.AreEqual(1, user1.pairedDevices.Count);
+        Assert.AreEqual(1, user2.pairedDevices.Count);
+        Assert.AreEqual(1, user3.pairedDevices.Count);
+
+        Assert.AreEqual(keyboard, user1.pairedDevices[0]);
+        Assert.AreEqual(keyboard, user2.pairedDevices[0]);
+        Assert.AreEqual(keyboard, user3.pairedDevices[0]);
+    }
+
     [Test]
     [Category("Users")]
     public void Users_CanDetectChangeInBindings()
@@ -1203,6 +1238,27 @@ internal class UserTests : CoreTestsFixture
         Assert.That(user2.pairedDevices, Is.EquivalentTo(new[] { user2pad }));
         Assert.That(user3.pairedDevices, Is.EquivalentTo(new[] { user3pad }));
     }
+
+    #if UNITY_EDITOR
+    [Test]
+    [Category("Users")]
+    public void Users_DoNotReactToEditorInput()
+    {
+        InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDevicesRespectGameViewFocus;
+
+        var gamepad = InputSystem.AddDevice<Gamepad>();
+
+        ++InputUser.listenForUnpairedDeviceActivity;
+        InputUser.onUnpairedDeviceUsed += (control, eventPtr) => Assert.Fail("Should not react!");
+
+        runtime.PlayerFocusLost();
+
+        Press(gamepad.buttonSouth);
+
+        Assert.That(gamepad.buttonSouth.isPressed, Is.True);
+    }
+
+    #endif
 
     [Test]
     [Category("Users")]

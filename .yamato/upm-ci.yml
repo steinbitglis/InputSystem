@@ -46,7 +46,7 @@ build_ios_{{ editor.version }}:
   name: Build Tests on {{ editor.version }} on ios
   agent:
     type: Unity::VM::osx
-    image: mobile/macos-10.13-testing:stable
+    image: mobile/macos-10.15-testing:stable
     flavor: b1.large
   commands:
     - pip install unity-downloader-cli --index-url https://artifactory.prd.it.unity3d.com/artifactory/api/pypi/pypi/simple
@@ -61,12 +61,12 @@ build_ios_{{ editor.version }}:
     logs:
         paths:
           - "build/logs/**"
- 
+
 run_ios_{{ editor.version }}:
   name: Run Tests on {{ editor.version }} on ios
   agent:
       type: Unity::mobile::iPhone
-      image: mobile/macos-10.13-testing:stable
+      image: mobile/macos-10.15-testing:stable
       flavor: b1.medium
   skip_checkout: true
   dependencies:
@@ -82,12 +82,12 @@ run_ios_{{ editor.version }}:
     logs:
         paths:
           - "build/test-results/**"
-		  
+
 build_tvos_{{ editor.version }}:
   name: Build Tests on {{ editor.version }} on tvos
   agent:
     type: Unity::VM::osx
-    image: mobile/macos-10.13-testing:stable
+    image: mobile/macos-10.15-testing:stable
     flavor: b1.large
   commands:
     - pip install unity-downloader-cli --index-url https://artifactory.prd.it.unity3d.com/artifactory/api/pypi/pypi/simple
@@ -102,13 +102,13 @@ build_tvos_{{ editor.version }}:
     logs:
         paths:
           - "build/logs/**"
-  
+
 {% for backend in scripting_backends %}
 build_android_{{ editor.version }}_{{ backend.name }}:
   name: Build Tests on {{ editor.version }} on android {{ backend.name }}
   agent:
       type: Unity::VM
-      image: mobile/android-execution-r19:stable
+      image: mobile/android-package-ci-win:latest
       flavor: b1.xlarge
   commands:
     - pip install unity-downloader-cli --index-url https://artifactory.prd.it.unity3d.com/artifactory/api/pypi/pypi/simple
@@ -122,13 +122,13 @@ build_android_{{ editor.version }}_{{ backend.name }}:
     logs:
         paths:
           - "build/logs/**"
+
 run_android_{{ editor.version }}_{{ backend.name }}:
   name: Run Tests on {{ editor.version }} on android {{ backend.name }}
   agent:
       type: Unity::mobile::shield
-      image: mobile/android-execution-r19:stable
+      image: mobile/android-package-ci-win:latest
       flavor: b1.medium
-      
   # Skip repository cloning
   skip_checkout: true
   # Set a dependency on the build job
@@ -158,7 +158,6 @@ run_android_{{ editor.version }}_{{ backend.name }}:
 
 {% endfor %}
 
-
 all_tests:
   name: All Tests
   dependencies:
@@ -172,6 +171,7 @@ all_tests:
     - .yamato/upm-ci.yml#run_ios_{{ editor.version }}
     - .yamato/upm-ci.yml#build_tvos_{{ editor.version }}
     {% endfor %}
+    - .yamato/upm-ci.yml#publish_dryrun
   triggers:
     cancel_old_ci: true
     pull_requests:
@@ -179,19 +179,24 @@ all_tests:
           only:
             - "develop"
 
-publish:
-  name: Publish to Internal Registry
+{% for run in (1..2) %}
+publish{% cycle "", "_dryrun" %}:
+  name: Publish to Internal Registry {% cycle "", "(Dry Run)" %}
   agent:
     type: Unity::VM
     image: package-ci/win10:stable
     flavor: b1.large
+  variables:
+    UPMCI_ENABLE_PACKAGE_SIGNING: 1
   commands:
-    - mv ./Assets/Samples ./Packages/com.unity.inputsystem
-    - mv ./Assets/Samples.meta ./Packages/com.unity.inputsystem
+    - move /Y .\Assets\Samples .\Packages\com.unity.inputsystem
+    - move /Y .\Assets\Samples.meta .\Packages\com.unity.inputsystem
     - npm install upm-ci-utils@stable -g --registry https://artifactory.prd.cds.internal.unity3d.com/artifactory/api/npm/upm-npm
     - upm-ci package pack --package-path ./Packages/com.unity.inputsystem/
-    - upm-ci package publish --package-path ./Packages/com.unity.inputsystem/
+    - upm-ci package test --package-path ./Packages/com.unity.inputsystem/ -u 2019.4
+    - upm-ci package publish --package-path ./Packages/com.unity.inputsystem/ {% cycle "", "--dry-run" %}
   artifacts:
     artifacts:
       paths:
         - "upm-ci~/packages/*.tgz"
+{% endfor %}

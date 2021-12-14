@@ -33,6 +33,8 @@ using UnityEngine.Serialization;
 ////        have to come preconfigured and work robustly for the user without requiring much understanding of how
 ////        the system fits together.
 
+////REVIEW: add "lastControl" property? (and maybe a lastDevice at the InputActionMap/Asset level?)
+
 ////REVIEW: have single delegate instead of separate performed/started/canceled callbacks?
 
 ////REVIEW: Do we need to have separate display names for actions?
@@ -439,9 +441,7 @@ namespace UnityEngine.InputSystem
         /// </example>
         ///
         /// Note that this array will not contain the same control multiple times even if more than
-        /// one binding on an action references the same control. Instead, the first binding on
-        /// an action that resolves to a particular control will essentially "own" the control
-        /// and subsequent bindings for the action will be blocked from resolving to the same control.
+        /// one binding on an action references the same control.
         ///
         /// <example>
         /// <code>
@@ -507,6 +507,11 @@ namespace UnityEngine.InputSystem
         /// </remarks>
         public InputActionPhase phase => currentState.phase;
 
+        /// <summary>
+        /// True if the action is currently in <see cref="InputActionPhase.Started"/> or <see cref="InputActionPhase.Performed"/>
+        /// phase. False in all other cases.
+        /// </summary>
+        /// <see cref="phase"/>
         public bool inProgress => phase.IsInProgress();
 
         /// <summary>
@@ -537,8 +542,8 @@ namespace UnityEngine.InputSystem
         /// <see cref="InputActionPhase.Started"/>
         public event Action<CallbackContext> started
         {
-            add => m_OnStarted.Append(value);
-            remove => m_OnStarted.Remove(value);
+            add => m_OnStarted.AddCallback(value);
+            remove => m_OnStarted.RemoveCallback(value);
         }
 
         /// <summary>
@@ -552,8 +557,8 @@ namespace UnityEngine.InputSystem
         /// <see cref="InputActionPhase.Canceled"/>
         public event Action<CallbackContext> canceled
         {
-            add => m_OnCanceled.Append(value);
-            remove => m_OnCanceled.Remove(value);
+            add => m_OnCanceled.AddCallback(value);
+            remove => m_OnCanceled.RemoveCallback(value);
         }
 
         /// <summary>
@@ -566,8 +571,8 @@ namespace UnityEngine.InputSystem
         /// <see cref="InputActionPhase.Performed"/>
         public event Action<CallbackContext> performed
         {
-            add => m_OnPerformed.Append(value);
-            remove => m_OnPerformed.Remove(value);
+            add => m_OnPerformed.AddCallback(value);
+            remove => m_OnPerformed.RemoveCallback(value);
         }
 
         ////TODO: Obsolete and drop this when we can break API
@@ -604,9 +609,36 @@ namespace UnityEngine.InputSystem
         }
 
         /// <summary>
-        /// Whether the action wants a state check on its bound controls as soon as it is enabled.
+        /// Whether the action wants a state check on its bound controls as soon as it is enabled. This is always
+        /// true for <see cref="InputActionType.Value"/> actions but can optionally be enabled for <see cref="InputActionType.Button"/>
+        /// or <see cref="InputActionType.PassThrough"/> actions.
         /// </summary>
-        internal bool wantsInitialStateCheck => type == InputActionType.Value;
+        /// <remarks>
+        /// Usually, when an action is <see cref="enabled"/> (e.g. via <see cref="Enable"/>), it will start listening for input
+        /// and then trigger once the first input arrives. However, <see cref="controls"/> bound to an action may already be
+        /// actuated when an action is enabled. For example, if a "jump" action is bound to <see cref="Keyboard.spaceKey"/>,
+        /// the space bar may already be pressed when the jump action is enabled.
+        ///
+        /// <see cref="InputActionType.Value"/> actions handle this differently by immediately performing an "initial state check"
+        /// in the next input update (see <see cref="InputSystem.Update"/>) after being enabled. If any of the bound controls
+        /// is already actuated, the action will trigger right away -- even with no change in state on the controls.
+        ///
+        /// This same behavior can be enabled explicitly for <see cref="InputActionType.Button"/> and <see cref="InputActionType.PassThrough"/>
+        /// actions using this property.
+        /// </remarks>
+        /// <seealso cref="Enable"/>
+        /// <seealso cref="InputActionType.Value"/>
+        public bool wantsInitialStateCheck
+        {
+            get => type == InputActionType.Value || (m_Flags & ActionFlags.WantsInitialStateCheck) != 0;
+            set
+            {
+                if (value)
+                    m_Flags |= ActionFlags.WantsInitialStateCheck;
+                else
+                    m_Flags &= ~ActionFlags.WantsInitialStateCheck;
+            }
+        }
 
         /// <summary>
         /// Construct an unnamed, free-standing action that is not part of any map or asset
@@ -1000,13 +1032,17 @@ namespace UnityEngine.InputSystem
         /// <remarks>
         /// This method can be used to forcibly cancel an action even while it is in progress. Note that unlike
         /// disabling an action, for example, this also effects APIs such as <see cref="WasPressedThisFrame"/>.
+        ///
+        /// Note that invoking this method will not modify enabled state.
         /// </remarks>
         /// <seealso cref="inProgress"/>
         /// <seealso cref="phase"/>
+        /// <seealso cref="Enable"/>
+        /// <seealso cref="Disable"/>
         public void Reset()
         {
             var state = GetOrCreateActionMap().m_State;
-            state?.ResetActionState(m_ActionIndexInState, hardReset: true);
+            state?.ResetActionState(m_ActionIndexInState, toPhase: enabled ? InputActionPhase.Waiting : InputActionPhase.Disabled, hardReset: true);
         }
 
         /// <summary>
@@ -1094,6 +1130,9 @@ namespace UnityEngine.InputSystem
         ///
         /// This method will disregard whether the action is currently enabled or disabled. It will keep returning
         /// true for the duration of the frame even if the action was subsequently disabled in the frame.
+        ///
+        /// The meaning of "frame" is either the current "dynamic" update (<c>MonoBehaviour.Update</c>) or the current
+        /// fixed update (<c>MonoBehaviour.FixedUpdate</c>) depending on the value of the <see cref="InputSettings.updateMode"/> setting.
         /// </remarks>
         /// <seealso cref="IsPressed"/>
         /// <seealso cref="WasReleasedThisFrame"/>
@@ -1140,6 +1179,9 @@ namespace UnityEngine.InputSystem
         ///
         /// This method will disregard whether the action is currently enabled or disabled. It will keep returning
         /// true for the duration of the frame even if the action was subsequently disabled in the frame.
+        ///
+        /// The meaning of "frame" is either the current "dynamic" update (<c>MonoBehaviour.Update</c>) or the current
+        /// fixed update (<c>MonoBehaviour.FixedUpdate</c>) depending on the value of the <see cref="InputSettings.updateMode"/> setting.
         /// </remarks>
         /// <seealso cref="IsPressed"/>
         /// <seealso cref="WasPressedThisFrame"/>
@@ -1196,6 +1238,9 @@ namespace UnityEngine.InputSystem
         ///
         /// This method will disregard whether the action is currently enabled or disabled. It will keep returning
         /// true for the duration of the frame even if the action was subsequently disabled in the frame.
+        ///
+        /// The meaning of "frame" is either the current "dynamic" update (<c>MonoBehaviour.Update</c>) or the current
+        /// fixed update (<c>MonoBehaviour.FixedUpdate</c>) depending on the value of the <see cref="InputSettings.updateMode"/> setting.
         /// </remarks>
         /// <seealso cref="WasPressedThisFrame"/>
         /// <seealso cref="phase"/>
@@ -1381,6 +1426,7 @@ namespace UnityEngine.InputSystem
         // For singleton actions, we serialize the bindings directly as part of the action.
         // For any other type of action, this is null.
         [SerializeField] internal InputBinding[] m_SingletonActionBindings;
+        [SerializeField] internal ActionFlags m_Flags;
 
         [NonSerialized] internal InputBinding? m_BindingMask;
         [NonSerialized] internal int m_BindingsStartIndex;
@@ -1407,9 +1453,9 @@ namespace UnityEngine.InputSystem
         [NonSerialized] internal InputActionMap m_ActionMap;
 
         // Listeners. No array allocations if only a single listener.
-        [NonSerialized] internal InlinedArray<Action<CallbackContext>> m_OnStarted;
-        [NonSerialized] internal InlinedArray<Action<CallbackContext>> m_OnCanceled;
-        [NonSerialized] internal InlinedArray<Action<CallbackContext>> m_OnPerformed;
+        [NonSerialized] internal CallbackArray<Action<CallbackContext>> m_OnStarted;
+        [NonSerialized] internal CallbackArray<Action<CallbackContext>> m_OnCanceled;
+        [NonSerialized] internal CallbackArray<Action<CallbackContext>> m_OnPerformed;
 
         /// <summary>
         /// Whether the action is a loose action created in code (e.g. as a property on a component).
@@ -1420,6 +1466,12 @@ namespace UnityEngine.InputSystem
         /// actions without action maps.
         /// </remarks>
         internal bool isSingletonAction => m_ActionMap == null || ReferenceEquals(m_ActionMap.m_SingletonAction, this);
+
+        [Flags]
+        internal enum ActionFlags
+        {
+            WantsInitialStateCheck = 1 << 0,
+        }
 
         private InputActionState.TriggerState currentState
         {

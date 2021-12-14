@@ -27,7 +27,7 @@ namespace UnityEngine.InputSystem.LowLevel
         /// </summary>
         /// <value>Position of mouse on screen.</value>
         /// <seealso cref="Pointer.position"/>
-        [InputControl(usage = "Point")]
+        [InputControl(usage = "Point", dontReset = true)] // Mouse should stay put when we reset devices.
         [FieldOffset(0)]
         public Vector2 position;
 
@@ -167,7 +167,6 @@ namespace UnityEngine.InputSystem
     /// To control cursor display and behavior, use <see cref="UnityEngine.Cursor"/>.
     /// </remarks>
     [InputControlLayout(stateType = typeof(MouseState), isGenericTypeOfDevice = true)]
-    [Scripting.Preserve]
     public class Mouse : Pointer, IInputStateCallbackReceiver
     {
         /// <summary>

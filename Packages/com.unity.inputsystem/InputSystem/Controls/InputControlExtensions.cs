@@ -41,6 +41,7 @@ namespace UnityEngine.InputSystem
             return null;
         }
 
+        ////REVIEW: This ist too high up in the class hierarchy; can be applied to any kind of control without it being readily apparent what exactly it means
         /// <summary>
         /// Check whether the given control is considered pressed according to the button press threshold.
         /// </summary>
@@ -99,8 +100,14 @@ namespace UnityEngine.InputSystem
             var magnitude = control.EvaluateMagnitude();
             if (magnitude < 0)
             {
-                ////REVIEW: we probably want to do a value comparison on this path to compare it to the default value
-                return true;
+                // We know the control is not in default state but we also know it doesn't support
+                // magnitude. So, all we can say is that it is actuated. Not how much it is actuated.
+                //
+                // If we're looking for a specific threshold here, consider the control to always
+                // be under. But if not, consider it actuated "by virtue of not being in default state".
+                if (Mathf.Approximately(threshold, 0))
+                    return true;
+                return false;
             }
 
             if (Mathf.Approximately(threshold, 0))
@@ -912,7 +919,7 @@ namespace UnityEngine.InputSystem
             var device = control.device;
 
             builder.Append('<');
-            builder.Append(deviceLayout);
+            builder.Append(deviceLayout.Escape("\\>", "\\>"));
             builder.Append('>');
 
             // Add usages of device, if any.
@@ -920,14 +927,16 @@ namespace UnityEngine.InputSystem
             for (var i = 0; i < deviceUsages.Count; ++i)
             {
                 builder.Append('{');
-                builder.Append(deviceUsages[i]);
+                builder.Append(deviceUsages[i].ToString().Escape("\\}", "\\}"));
                 builder.Append('}');
             }
 
-            builder.Append('/');
+            builder.Append(InputControlPath.Separator);
 
-            var devicePath = device.path;
-            var controlPath = control.path;
+            // If any of the components contains a backslash, double it up as in control paths,
+            // these serve as escape characters.
+            var devicePath = device.path.Replace("\\", "\\\\");
+            var controlPath = control.path.Replace("\\", "\\\\");
             builder.Append(controlPath, devicePath.Length + 1, controlPath.Length - devicePath.Length - 1);
 
             return builder.ToString();
@@ -1054,6 +1063,77 @@ namespace UnityEngine.InputSystem
         {
             return eventPtr.EnumerateControls
                     (Enumerate.IgnoreControlsInCurrentState, device, magnitudeThreshold);
+        }
+
+        /// <summary>
+        /// Return true if the given <paramref name="eventPtr"/> has any <see cref="Input"/>
+        /// </summary>
+        /// <param name="eventPtr"></param>
+        /// <param name="magnitude"></param>
+        /// <param name="buttonControlsOnly"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"><paramref name="eventPtr"/> is a <c>null</c> pointer.</exception>
+        /// <exception cref="ArgumentException"><paramref name="eventPtr"/> is not a <see cref="StateEvent"/> or <see cref="DeltaStateEvent"/> -or-
+        /// the <see cref="InputDevice"/> referenced by the <see cref="InputEvent.deviceId"/> in the event cannot be found.</exception>
+        /// <seealso cref="EnumerateChangedControls"/>
+        /// <seealso cref="ButtonControl.isPressed"/>
+        public static bool HasButtonPress(this InputEventPtr eventPtr, float magnitude = -1, bool buttonControlsOnly = true)
+        {
+            return eventPtr.GetFirstButtonPressOrNull(magnitude, buttonControlsOnly) != null;
+        }
+
+        /// <summary>
+        /// Get the first pressed button from the given event or null if the event doesn't contain a new button press.
+        /// </summary>
+        /// <param name="eventPtr"></param>
+        /// <param name="magnitude"></param>
+        /// <param name="buttonControlsOnly"></param>
+        /// <returns>The control that was pressed.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="eventPtr"/> is a <c>null</c> pointer.</exception>
+        /// <exception cref="ArgumentException"><paramref name="eventPtr"/> is not a <see cref="StateEvent"/> or <see cref="DeltaStateEvent"/> -or-
+        /// the <see cref="InputDevice"/> referenced by the <see cref="InputEvent.deviceId"/> in the event cannot be found.</exception>
+        /// <seealso cref="EnumerateChangedControls"/>
+        /// <seealso cref="ButtonControl.isPressed"/>
+        /// <remarks>Buttons will be evaluated in the order that they appear in the devices layout i.e. the bit position of each control
+        /// in the devices state memory. For example, in the gamepad state, button north (bit position 4) will be evaluated before button
+        /// east (bit position 5), so if both buttons were pressed in the given event, button north would be returned.</remarks>
+        public static InputControl GetFirstButtonPressOrNull(this InputEventPtr eventPtr, float magnitude = -1, bool buttonControlsOnly = true)
+        {
+            if (magnitude < 0)
+                magnitude = InputSystem.settings.defaultButtonPressPoint;
+
+            foreach (var control in eventPtr.EnumerateControls(Enumerate.IgnoreControlsInDefaultState, magnitudeThreshold: magnitude))
+            {
+                if (buttonControlsOnly && !control.isButton)
+                    continue;
+                return control;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Enumerate all pressed buttons in the given event.
+        /// </summary>
+        /// <param name="eventPtr">An event. Must be a <see cref="StateEvent"/> or <see cref="DeltaStateEvent"/>.</param>
+        /// <param name="magnitude"></param>
+        /// <param name="buttonControlsOnly"></param>
+        /// <returns>An enumerable collection containing all buttons that were pressed in the given event.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="eventPtr"/> is a <c>null</c> pointer.</exception>
+        /// <exception cref="ArgumentException"><paramref name="eventPtr"/> is not a <see cref="StateEvent"/> or <see cref="DeltaStateEvent"/> -or-
+        /// the <see cref="InputDevice"/> referenced by the <see cref="InputEvent.deviceId"/> in the event cannot be found.</exception>
+        /// <seealso cref="EnumerateChangedControls"/>
+        /// <seealso cref="ButtonControl.isPressed"/>
+        public static IEnumerable<InputControl> GetAllButtonPresses(this InputEventPtr eventPtr, float magnitude = -1, bool buttonControlsOnly = true)
+        {
+            if (magnitude < 0)
+                magnitude = InputSystem.settings.defaultButtonPressPoint;
+
+            foreach (var control in eventPtr.EnumerateControls(Enumerate.IgnoreControlsInDefaultState, magnitudeThreshold: magnitude))
+            {
+                if (buttonControlsOnly && !control.isButton)
+                    continue;
+                yield return control;
+            }
         }
 
         /// <summary>
@@ -1347,9 +1427,6 @@ namespace UnityEngine.InputSystem
                                 m_CurrentControl = null;
                                 continue;
                             }
-
-                            // Jump past location of this control.
-                            m_CurrentBitOffset = controlBitOffset + controlBitSize - m_CurrentControlStateBitOffset;
                         }
 
                         ++m_CurrentIndexInStateOffsetToControlIndexMap;
@@ -1659,6 +1736,15 @@ namespace UnityEngine.InputSystem
             public ControlBuilder IsSynthetic(bool value)
             {
                 control.synthetic = value;
+                return this;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public ControlBuilder DontReset(bool value)
+            {
+                control.dontReset = value;
+                if (value)
+                    control.m_Device.hasDontResetControls = true;
                 return this;
             }
 

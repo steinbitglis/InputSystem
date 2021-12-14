@@ -41,9 +41,9 @@ namespace UnityEngine.InputSystem.LowLevel
         /// Position of the pointer in screen space.
         /// </summary>
 #if UNITY_EDITOR
-        [InputControl(layout = "Vector2", displayName = "Position", usage = "Point", processors = "AutoWindowSpace")]
+        [InputControl(layout = "Vector2", displayName = "Position", usage = "Point", processors = "AutoWindowSpace", dontReset = true)]
 #else
-        [InputControl(layout = "Vector2", displayName = "Position", usage = "Point")]
+        [InputControl(layout = "Vector2", displayName = "Position", usage = "Point", dontReset = true)]
 #endif
         public Vector2 position;
 
@@ -83,7 +83,6 @@ namespace UnityEngine.InputSystem
     /// <seealso cref="Pen"/>
     /// <seealso cref="Touchscreen"/>
     [InputControlLayout(stateType = typeof(PointerState), isGenericTypeOfDevice = true)]
-    [Preserve]
     public class Pointer : InputDevice, IInputStateCallbackReceiver
     {
         ////REVIEW: shouldn't this be done for every touch position, too?

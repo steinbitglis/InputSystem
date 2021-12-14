@@ -151,12 +151,8 @@ namespace UnityEngine.InputSystem.LowLevel
         /// </summary>
         public event Action<InputEventPtr> onEvent
         {
-            add
-            {
-                if (!m_EventListeners.Contains(value))
-                    m_EventListeners.Append(value);
-            }
-            remove => m_EventListeners.Remove(value);
+            add => m_EventListeners.AddCallback(value);
+            remove => m_EventListeners.RemoveCallback(value);
         }
 
         public InputEventTrace(InputDevice device, long bufferSizeInBytes = kDefaultBufferSize, bool growBuffer = false,
@@ -486,16 +482,23 @@ namespace UnityEngine.InputSystem.LowLevel
         /// <summary>
         /// Resize the current event memory buffer to the specified size.
         /// </summary>
-        /// <param name="newBufferSize"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        public bool Resize(long newBufferSize)
+        /// <param name="newBufferSize">Size to allocate for the buffer.</param>
+        /// <param name="newMaxBufferSize">Optional parameter to specifying the mark up to which the buffer is allowed to grow. By default,
+        /// this is negative which indicates the buffer should not grow. In this case, <see cref="maxSizeInBytes"/> will be set
+        /// to <paramref name="newBufferSize"/>. If this parameter is a non-negative number, it must be greater than or equal to
+        /// <paramref name="newBufferSize"/> and will become the new value for <see cref="maxSizeInBytes"/>.</param>
+        /// <returns>True if the new buffer was successfully allocated.</returns>
+        /// <exception cref="ArgumentException"><paramref name="newBufferSize"/> is negative.</exception>
+        public bool Resize(long newBufferSize, long newMaxBufferSize = -1)
         {
             if (newBufferSize <= 0)
                 throw new ArgumentException("Size must be positive", nameof(newBufferSize));
 
             if (m_EventBufferSize == newBufferSize)
                 return true;
+
+            if (newMaxBufferSize < newBufferSize)
+                newMaxBufferSize = newBufferSize;
 
             // Allocate.
             var newEventBuffer = (byte*)UnsafeUtility.Malloc(newBufferSize, 4, Allocator.Persistent);
@@ -555,9 +558,7 @@ namespace UnityEngine.InputSystem.LowLevel
             m_EventBuffer = newEventBuffer;
             m_EventBufferHead = newEventBuffer;
             m_EventBufferTail = m_EventBuffer + m_EventSizeInBytes;
-
-            if (m_MaxEventBufferSize < newBufferSize)
-                m_MaxEventBufferSize = newBufferSize;
+            m_MaxEventBufferSize = newMaxBufferSize;
 
             ++m_ChangeCounter;
 
@@ -712,7 +713,7 @@ namespace UnityEngine.InputSystem.LowLevel
         [NonSerialized] private Func<InputEventPtr, InputDevice, bool> m_OnFilterEvent;
 
         [SerializeField] private int m_DeviceId = InputDevice.InvalidDeviceId;
-        [SerializeField] private InlinedArray<Action<InputEventPtr>> m_EventListeners;
+        [NonSerialized] private CallbackArray<Action<InputEventPtr>> m_EventListeners;
 
         // Buffer for storing event trace. Allocated in native so that we can survive a
         // domain reload without losing event traces.
@@ -928,8 +929,9 @@ namespace UnityEngine.InputSystem.LowLevel
             }
 
             // Notify listeners.
-            for (var i = 0; i < m_EventListeners.length; ++i)
-                m_EventListeners[i](new InputEventPtr((InputEvent*)buffer));
+            if (m_EventListeners.length > 0)
+                DelegateHelpers.InvokeCallbacksSafe(ref m_EventListeners, new InputEventPtr((InputEvent*)buffer),
+                    "InputEventTrace.onEvent");
 
             Profiler.EndSample();
         }
@@ -1327,7 +1329,7 @@ namespace UnityEngine.InputSystem.LowLevel
                 // returned from MoveNext).
                 if (currentEventPtr.type == FrameMarkerEvent)
                 {
-                    if (!MoveNext(false, out currentEventPtr))
+                    if (!MoveNext(false, out var nextEvent))
                     {
                         // Last frame.
                         Finished();
@@ -1335,8 +1337,14 @@ namespace UnityEngine.InputSystem.LowLevel
                     }
 
                     // Check for empty frame.
-                    if (currentEventPtr.type == FrameMarkerEvent)
+                    if (nextEvent.type == FrameMarkerEvent)
+                    {
+                        --position;
+                        m_Enumerator.m_Current = currentEventPtr;
                         return;
+                    }
+
+                    currentEventPtr = nextEvent;
                 }
 
                 // Inject our events into the frame.

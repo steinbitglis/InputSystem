@@ -99,4 +99,35 @@ internal class ArrayHelperTests
             array3.Dispose();
         }
     }
+
+    [Test]
+    [Category("Utilities")]
+    public void Utilities_IndexOfReference__IsUsingReferenceEqualsAndConstrainedByStartIndexAndCount()
+    {
+        var arr = new object[] { new object(), new object(), new object(), new object(), new object() };
+
+        Assert.AreEqual(-1, arr.IndexOfReference(new object(), 0, arr.Length));
+        Assert.AreEqual(-1, arr.IndexOfReference(arr[4], 4, 0));
+
+        Assert.AreEqual(0, arr.IndexOfReference(arr[0], 0, arr.Length));
+        Assert.AreEqual(4, arr.IndexOfReference(arr[4], 0, arr.Length));
+
+        Assert.AreEqual(-1, arr.IndexOfReference(arr[0], 1, 3));
+        Assert.AreEqual(-1, arr.IndexOfReference(arr[4], 1, 3));
+        Assert.AreEqual(1, arr.IndexOfReference(arr[1], 1, 3));
+        Assert.AreEqual(2, arr.IndexOfReference(arr[2], 1, 3));
+    }
+
+    [Test]
+    [Category("Utilities")]
+    public void Utilities_IndexOfPredicate__IsUsingPredicateForEqualityAndConstraintedByStartIndexAndCount()
+    {
+        var arr = new int[] { 0, 1, 2, 3, 4, 5 };
+
+        Assert.That(arr.IndexOf(x => x >= 3, 0, arr.Length), Is.EqualTo(3));
+        Assert.That(arr.IndexOf(x => x >= 3, 0, 3), Is.EqualTo(-1));
+        Assert.That(arr.IndexOf(x => x >= 3, 1, 3), Is.EqualTo(3));
+        Assert.That(arr.IndexOf(x => x >= 3, 4, 0), Is.EqualTo(-1));
+        Assert.That(arr.IndexOf(x => x < 0, 3, 3), Is.EqualTo(-1));
+    }
 }

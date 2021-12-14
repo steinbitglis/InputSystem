@@ -201,7 +201,7 @@ namespace UnityEngine.InputSystem
             if (map.asset != null)
                 map.asset.MarkAsDirty();
 
-            map.ClearPerActionCachedBindingData();
+            map.ClearCachedActionData();
             map.LazyResolveBindings();
 
             return action;
@@ -246,7 +246,7 @@ namespace UnityEngine.InputSystem
             if (actionMap.asset != null)
                 actionMap.asset.MarkAsDirty();
 
-            actionMap.ClearPerActionCachedBindingData();
+            actionMap.ClearCachedActionData();
 
             // Remove bindings to action from map.
             var newActionMapBindingCount = actionMap.m_Bindings.Length - bindingsForAction.Length;
@@ -479,8 +479,16 @@ namespace UnityEngine.InputSystem
 
             var actionMap = action.GetOrCreateActionMap();
 
-            ////REVIEW: use 'name' instead of 'path' field here?
-            var binding = new InputBinding {path = composite, interactions = interactions, processors = processors, isComposite = true, action = action.name};
+            var binding = new InputBinding
+            {
+                name = NameAndParameters.ParseName(composite),
+                path = composite,
+                interactions = interactions,
+                processors = processors,
+                isComposite = true,
+                action = action.name
+            };
+
             var bindingIndex = AddBindingInternal(actionMap, binding);
             return new CompositeSyntax(actionMap, action, bindingIndex);
         }
@@ -508,7 +516,7 @@ namespace UnityEngine.InputSystem
 
             // Invalidate per-action binding sets so that this gets refreshed if
             // anyone queries it.
-            map.ClearPerActionCachedBindingData();
+            map.ClearCachedActionData();
 
             // Make sure bindings get re-resolved.
             map.LazyResolveBindings();
@@ -727,10 +735,22 @@ namespace UnityEngine.InputSystem
             if (action == null)
                 throw new ArgumentNullException(nameof(action));
 
-            match.action = action.name;
-
             var actionMap = action.GetOrCreateActionMap();
-            var bindingIndexInMap = actionMap.FindBindingRelativeToMap(match);
+
+            int bindingIndexInMap = -1;
+            var id = action.idDontGenerate;
+            if (id != null)
+            {
+                // Prio1: Attempt to match action id (stronger)
+                match.action = action.id.ToString();
+                bindingIndexInMap = actionMap.FindBindingRelativeToMap(match);
+            }
+            if (bindingIndexInMap == -1)
+            {
+                // Prio2: Attempt to match action name (weaker)
+                match.action = action.name;
+                bindingIndexInMap = actionMap.FindBindingRelativeToMap(match);
+            }
             if (bindingIndexInMap == -1)
                 return default;
 
@@ -824,6 +844,7 @@ namespace UnityEngine.InputSystem
 
             var oldName = action.m_Name;
             action.m_Name = newName;
+            actionMap?.ClearActionLookupTable();
 
             if (actionMap?.asset != null)
                 actionMap?.asset.MarkAsDirty();
@@ -1046,7 +1067,7 @@ namespace UnityEngine.InputSystem
                 if (!valid)
                     throw new InvalidOperationException("Accessor is not valid");
                 m_ActionMap.m_Bindings[m_BindingIndexInMap].name = name;
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
                 return this;
             }
@@ -1063,7 +1084,7 @@ namespace UnityEngine.InputSystem
                 if (!valid)
                     throw new InvalidOperationException("Accessor is not valid");
                 m_ActionMap.m_Bindings[m_BindingIndexInMap].path = path;
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
                 return this;
             }
@@ -1102,7 +1123,7 @@ namespace UnityEngine.InputSystem
 
                 // Set groups on binding.
                 m_ActionMap.m_Bindings[m_BindingIndexInMap].groups = groups;
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
 
                 return this;
@@ -1135,7 +1156,7 @@ namespace UnityEngine.InputSystem
 
                 // Set interactions on binding.
                 m_ActionMap.m_Bindings[m_BindingIndexInMap].interactions = interactions;
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
 
                 return this;
@@ -1181,7 +1202,7 @@ namespace UnityEngine.InputSystem
 
                 // Set processors on binding.
                 m_ActionMap.m_Bindings[m_BindingIndexInMap].processors = processors;
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
 
                 return this;
@@ -1209,7 +1230,7 @@ namespace UnityEngine.InputSystem
                     throw new ArgumentException(
                         $"Cannot change the action a binding triggers on singleton action '{action}'", nameof(action));
                 m_ActionMap.m_Bindings[m_BindingIndexInMap].action = action.name;
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
                 return this;
             }
@@ -1230,7 +1251,7 @@ namespace UnityEngine.InputSystem
                     throw new InvalidOperationException("Accessor is not valid");
 
                 m_ActionMap.m_Bindings[m_BindingIndexInMap] = binding;
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
 
                 // If it's a singleton action, we force the binding to stay with the action.
@@ -1486,7 +1507,7 @@ namespace UnityEngine.InputSystem
                         ArrayHelpers.EraseAt(ref m_ActionMap.m_Bindings, m_BindingIndexInMap);
                 }
 
-                m_ActionMap.ClearPerActionCachedBindingData();
+                m_ActionMap.ClearCachedActionData();
                 m_ActionMap.LazyResolveBindings();
 
                 // We have switched to a different binding array. For singleton actions, we need to
